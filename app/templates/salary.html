@@ -1,0 +1,129 @@
+{% extends "_layout.html" %}
+{% import "_macros.html" as m %}
+{% block title %}{{ t('page.salary') }}{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <h1>{{ t('page.salary') }}</h1>
+  <p class="lede">What a salary from one year has to become in another to buy the
+    same basket, and how a figure compares with the published mean and median.</p>
+</div>
+
+<form class="card" method="get" action="/salary">
+  {% if lang != 'en' %}<input type="hidden" name="lang" value="{{ lang }}">{% endif %}
+  <div class="toolbar">
+    <div class="field">
+      <label for="amount">Monthly amount (GEL, gross)</label>
+      <input id="amount" type="number" name="amount" value="{{ '%.0f'|format(amount) }}" min="0" max="1000000" step="10">
+    </div>
+    <div class="field">
+      <label for="year_from">From {{ t('m.year') }}</label>
+      <select id="year_from" name="year_from">
+        {% for y in years %}<option value="{{ y }}" {{ 'selected' if y == year_from }}>{{ y }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="year_to">To {{ t('m.year') }}</label>
+      <select id="year_to" name="year_to">
+        {% for y in years %}<option value="{{ y }}" {{ 'selected' if y == year_to }}>{{ y }}</option>{% endfor %}
+      </select>
+    </div>
+    <button class="btn btn-primary" type="submit">Calculate</button>
+  </div>
+</form>
+
+<div class="grid grid-3" style="margin-top:14px">
+  <div class="metric">
+    <div class="metric-label">{{ t('m.purchasing_power') }} preserved</div>
+    <div class="metric-value is-accent">{{ m.num(equivalent) }}</div>
+    <div class="metric-sub">GEL needed in {{ year_to }} to match {{ m.num(amount) }} GEL in {{ year_from }}</div>
+  </div>
+  <div class="metric">
+    <div class="metric-label">Cumulative {{ t('m.inflation') }}</div>
+    <div class="metric-value {{ 'is-warn' if inflation > 0 else 'is-pass' }}">{{ '%+.1f'|format(inflation) }}%</div>
+    <div class="metric-sub">{{ year_from }} to {{ year_to }}{% if span %} · {{ '%+.2f'|format(annualised) }}% a year{% endif %}</div>
+  </div>
+  <div class="metric">
+    <div class="metric-label">{{ m.num(amount) }} GEL in {{ year_from }} prices</div>
+    <div class="metric-value">{{ m.num(real_today) }}</div>
+    <div class="metric-sub">if that amount were earned in {{ year_to }}</div>
+  </div>
+</div>
+
+<div class="card" style="margin-top:14px">
+  <h2 style="margin-bottom:10px">The nominal-to-real breakdown</h2>
+  <div class="formula">equivalent = amount × (CPI_{{ year_to }} / CPI_{{ year_from }})
+           = {{ '%.2f'|format(amount) }} × ({{ '%.4f'|format(cpi_hi) }} / {{ '%.4f'|format(cpi_lo) }})
+           = {{ '%.2f'|format(equivalent) }} GEL
+
+real     = amount × (CPI_{{ year_from }} / CPI_{{ year_to }})
+           = {{ '%.2f'|format(amount) }} × ({{ '%.4f'|format(cpi_lo) }} / {{ '%.4f'|format(cpi_hi) }})
+           = {{ '%.2f'|format(real_today) }} GEL in {{ year_from }} prices</div>
+  <p class="note" style="margin:14px 0 0">
+    <strong>These two are inverses.</strong> Deflating {{ year_to }} money into
+    {{ year_from }} prices and inflating {{ year_from }} money into {{ year_to }}
+    prices use the same ratio the other way up; the test suite asserts the
+    round trip returns the original amount.
+  </p>
+</div>
+
+<section class="section">
+  <div class="section-head"><h2>Where {{ m.num(amount) }} GEL sits against the published figures</h2></div>
+  <div class="card">
+    <dl class="kv">
+      <dt>Published mean, {{ compare_year }}</dt>
+      <dd>{{ m.num(mean_value) }} GEL{% if is_preliminary %} <span class="pill pill-warn">{{ t('q.preliminary') }}</span>{% endif %}</dd>
+      <dt>Your amount as % of the mean</dt>
+      <dd>{% if vs_mean %}{{ '%.1f'|format(vs_mean) }}%{% else %}n/a{% endif %}</dd>
+      {% if median_year %}
+      <dt>Published median, {{ median_year }}</dt>
+      <dd>{{ m.num(median_value) }} GEL</dd>
+      <dt>Your amount as % of the median</dt>
+      <dd>{% if vs_median %}{{ '%.1f'|format(vs_median) }}%{% else %}n/a{% endif %}</dd>
+      {% endif %}
+    </dl>
+    <p class="note note-warn" style="margin:16px 0 0">
+      <strong>Read this carefully.</strong> Both published figures are
+      <strong>gross, before personal income tax</strong>, and the mean is an
+      average over paid employees, not a typical salary. Being above the mean
+      does not mean being paid more than most people: the mean sits well above
+      the median because high earners pull it up. GeoStats will not convert
+      either figure to take-home pay, because that needs the tax rules for each
+      year and this project ingests statistics, not tax law.
+    </p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-head"><h2>Year by year</h2></div>
+  <div class="card">{{ m.chart(chart) }}</div>
+  <div class="card card-tight" style="margin-top:14px">
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr><th>{{ t('m.year') }}</th><th class="num">CPI (2010=100)</th>
+          <th class="num">Equivalent of {{ m.num(amount) }} GEL</th>
+          <th class="num">Cumulative {{ t('m.inflation') }}</th></tr></thead>
+        <tbody>
+        {% for r in ladder %}
+          <tr>
+            <td class="mono">{{ r.period }}</td>
+            <td class="num">{{ m.num(r.cpi, 4) }}</td>
+            <td class="num">{{ m.num(r.equivalent) }}</td>
+            <td class="num">{{ '%+.2f'|format((r.equivalent / amount - 1) * 100 if amount else 0) }}%</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="4"><div class="empty">No CPI years in this range.</div></td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {{ m.provenance([
+      ('CPI dataset', 'cpi_2010_base'),
+      ('indicator', 'cpi_annual_avg_2010_100'),
+      ('breakdown', 'georgia'),
+      ('vintage', vintage_id),
+      ('source', source_url),
+  ]) }}
+</section>
+{% endblock %}

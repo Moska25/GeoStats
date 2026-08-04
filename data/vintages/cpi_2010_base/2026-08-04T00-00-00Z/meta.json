@@ -1,0 +1,17 @@
+{
+  "dataset_id": "cpi_2010_base",
+  "vintage_id": "2026-08-04T00-00-00Z",
+  "title": "Consumer price index, 2010 average = 100",
+  "source_url": "https://geostat.ge/media/81846/consumer-price-index-2010%3D100-%2810%29.xlsx",
+  "source_page": "https://www.geostat.ge/en/modules/categories/26/inflation-consumer-price-index",
+  "retrieved_at": "2026-08-04T00:00:00+00:00",
+  "http_status": 200,
+  "byte_size": 42300,
+  "sha256": "43255aa7ab496ec955a000ad347270d4b8b1261d2462f71ed1ca07aed80e2329",
+  "row_count": 2070,
+  "period_grain": "monthly",
+  "unit_family": "index_2010_100",
+  "note": "Monthly index for Georgia and five cities. GeoStats derives an annual average only from years with all twelve months present.",
+  "user_agent": "browser User-Agent required; Geostat returns 0 bytes without one",
+  "retrieval_via": "direct fetch from geostat.ge"
+}

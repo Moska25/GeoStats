@@ -1,0 +1,154 @@
+{% extends "_layout.html" %}
+{% import "_macros.html" as m %}
+{% block title %}{{ adapter.title }}{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <h1>{{ adapter.title }}</h1>
+  <p class="lede">{{ adapter.note }}</p>
+</div>
+
+<p class="row">
+  <a class="btn btn-sm" href="/reliability{{ qs }}">Back to all datasets</a>
+  <span class="tag">{{ dataset_id }}</span>
+  <span class="tag">{{ history|length }} vintage(s)</span>
+  <form method="post" action="/refresh" style="display:inline">
+    <input type="hidden" name="dataset_id" value="{{ dataset_id }}">
+    <button class="btn btn-sm" type="submit">{{ t('q.refresh') }}</button>
+  </form>
+</p>
+
+<section class="section">
+  <div class="section-head"><h2>Contract results, latest vintage</h2>
+    <span class="tag">{{ latest }}</span></div>
+  {% for c in checks %}
+  <div class="card" style="margin-bottom:10px">
+    <div class="row" style="margin-bottom:8px">
+      {{ m.pill(c.passed) }}
+      <strong>{{ c.code }}</strong>
+      <span class="muted">{{ c.title }}</span>
+      <span class="spacer"></span>
+      <span class="tag">{{ '{:,}'.format(c.checked) }} checked</span>
+    </div>
+    <p class="small" style="margin-bottom:8px">{{ c.message }}</p>
+    <p class="small faint" style="margin-bottom:0">Why: {{ c.why }}</p>
+    {% if c.offender_rows %}
+    <div class="table-wrap" style="margin-top:12px">
+      <table class="data">
+        <thead><tr><th>Breakdown</th><th>{{ t('m.period') }}</th><th>{{ t('m.unit') }}</th>
+          <th class="num">{{ t('m.value') }}</th><th>Problem</th></tr></thead>
+        <tbody>
+        {% for o in c.offender_rows[:12] %}
+          <tr>
+            <td class="mono">{{ o.get('breakdown_code', '-') }}</td>
+            <td class="mono">{{ o.get('period', '-') }}</td>
+            <td class="mono">{{ o.get('unit', '-') }}</td>
+            <td class="num">{{ m.num(o.get('value')) }}</td>
+            <td class="wrap">{{ o.get('_problem', '') }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if c.offender_rows|length > 12 %}
+    <p class="small faint" style="margin:8px 0 0">{{ c.offender_rows|length - 12 }} more not shown.</p>
+    {% endif %}
+    {% endif %}
+  </div>
+  {% else %}
+  <div class="empty">No contract results recorded for this dataset.</div>
+  {% endfor %}
+</section>
+
+<section class="section">
+  <div class="section-head"><h2>Vintage log</h2>
+    <span class="tag">newest first · nothing here is ever overwritten</span></div>
+  <ul class="timeline">
+  {% for v in history %}
+    <li class="{{ 'ok' if loop.first else '' }}">
+      <div class="t-when">{{ v.retrieved_at }}</div>
+      <div class="t-what">
+        <strong>{{ v.vintage_id }}</strong>
+        <span class="tag">{{ '{:,}'.format(v.row_count) }} rows</span>
+        <span class="tag">{{ '{:,}'.format(v.byte_size) }} bytes</span>
+        <span class="tag">HTTP {{ v.http_status }}</span>
+      </div>
+      <div class="small faint mono" style="word-break:break-all">sha256 {{ v.sha256 }}</div>
+      <div class="small faint">via {{ v.retrieval_via }}</div>
+      {% if v.release_note %}<div class="small muted">{{ v.release_note }}</div>{% endif %}
+      {% if v.diff %}
+        <div class="card" style="margin-top:10px">
+          <div class="row" style="margin-bottom:8px">
+            <span class="pill {{ 'pill-idle' if v.diff.bytes_identical else 'pill-info' }}">
+              {{ 'bytes identical' if v.diff.bytes_identical else 'bytes differ' }}</span>
+            <span class="tag">vs {{ v.diff.old_vintage }}</span>
+          </div>
+          <dl class="kv">
+            <dt>Values revised</dt><dd>{{ v.diff.changed|length }}</dd>
+            <dt>Series added</dt><dd>{{ v.diff.added|length }}</dd>
+            <dt>Series removed</dt><dd>{{ v.diff.removed|length }}</dd>
+            <dt>Preliminary flag changes</dt><dd>{{ v.diff.preliminary_flag_changes|length }}</dd>
+          </dl>
+          {% if v.diff.changed %}
+          <div class="table-wrap" style="margin-top:12px">
+            <table class="data">
+              <thead><tr><th>Series</th><th>{{ t('m.period') }}</th>
+                <th class="num">Was</th><th class="num">Now</th><th class="num">Delta</th></tr></thead>
+              <tbody>
+              {% for ch in v.diff.changed[:15] %}
+                <tr>
+                  <td class="mono">{{ ch.breakdown_code }}</td>
+                  <td class="mono">{{ ch.period }}</td>
+                  <td class="num">{{ m.num(ch.old_value) }}</td>
+                  <td class="num">{{ m.num(ch.new_value) }}</td>
+                  <td class="num">{{ m.num(ch.delta) }}</td>
+                </tr>
+              {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <p class="small faint" style="margin:8px 0 0">
+            Read this as: "{{ v.diff.changed[0].period }} changed from
+            {{ v.diff.changed[0].old_value }} to {{ v.diff.changed[0].new_value }}
+            in the release retrieved on {{ v.retrieved_at[:10] }}."
+          </p>
+          {% elif v.diff.added %}
+          <p class="small muted" style="margin:10px 0 0">
+            No previously published value was revised in this release. It added
+            {{ v.diff.added|length }} new series-periods
+            ({{ v.diff.added[0].period }} onward) and left every earlier figure
+            byte-for-byte identical. Confirming a non-revision is worth as much as
+            catching one.
+          </p>
+          {% endif %}
+        </div>
+      {% else %}
+        <div class="small faint" style="margin-top:6px">Earliest retrieval on record; nothing to diff against.</div>
+      {% endif %}
+    </li>
+  {% else %}
+    <li><div class="empty">No vintages.</div></li>
+  {% endfor %}
+  </ul>
+</section>
+
+<section class="section">
+  <div class="section-head"><h2>Source</h2></div>
+  <div class="card">
+    <dl class="kv">
+      <dt>File</dt><dd><a href="{{ adapter.url }}">{{ adapter.url }}</a></dd>
+      <dt>Page</dt><dd><a href="{{ adapter.source_page }}">{{ adapter.source_page }}</a></dd>
+      <dt>Sheets</dt><dd>{{ adapter.expected_sheets|join(', ') }}</dd>
+      <dt>Grain</dt><dd>{{ adapter.period_grain }}</dd>
+      <dt>Unit family</dt><dd>{{ adapter.unit_family }}</dd>
+    </dl>
+    <p class="note" style="margin:16px 0 0">
+      <strong>Fetching this needs a browser User-Agent.</strong> Without one
+      Geostat answers 200 with a zero-byte body, which a naive ingester records
+      as a successful empty release. The adapter sends a Chrome UA and a Referer,
+      and the byte size is stored in every vintage so an empty response is
+      visible rather than silent.
+    </p>
+  </div>
+</section>
+{% endblock %}

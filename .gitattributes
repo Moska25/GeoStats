@@ -1,2 +1,8 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Committed vintages must survive checkout byte-for-byte: their recorded sha256
+# is the whole point of the project. Keep line-ending normalisation away from
+# them, including the JSON that must stay consistent with those bytes.
+*.xlsx binary
+data/vintages/** -text

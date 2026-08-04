@@ -1,0 +1,147 @@
+{% extends "_layout.html" %}
+{% import "_macros.html" as m %}
+{% block title %}{{ t('page.overview') }}{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <h1>{{ t('page.overview') }}</h1>
+  <p class="lede">Official Georgian wage and price statistics, kept as immutable
+    vintages and checked against data contracts before anything is plotted. Every
+    number on this page is computed from a workbook committed in this repository.</p>
+</div>
+
+<div class="grid grid-4">
+  <div class="metric">
+    <div class="metric-label">{{ t('m.mean') }} · {{ latest_year }}</div>
+    <div class="metric-value">{{ m.num(latest_wage) }}</div>
+    <div class="metric-sub">GEL / month{% if latest_is_preliminary %} ·
+      <span class="pill pill-warn">{{ t('q.preliminary') }}</span>{% endif %}</div>
+  </div>
+  <div class="metric">
+    <div class="metric-label">{{ t('m.median') }} · {{ latest_median_year }}</div>
+    <div class="metric-value">{{ m.num(latest_median) }}</div>
+    <div class="metric-sub">GEL / month · Revenue Service records</div>
+  </div>
+  {% if gap %}
+  <div class="metric">
+    <div class="metric-label">{{ t('m.mean') }} − {{ t('m.median') }} · {{ latest_median_year }}</div>
+    <div class="metric-value is-warn">{{ '%.1f'|format(gap.gap_pct) }}%</div>
+    <div class="metric-sub">the average sits above the middle earner</div>
+  </div>
+  {% endif %}
+  {% if latest_real %}
+  <div class="metric">
+    <div class="metric-label">{{ t('m.real') }} {{ t('m.index') }} · {{ base_year }}=100</div>
+    <div class="metric-value is-accent">{{ '%.1f'|format(latest_real.real_index) }}</div>
+    <div class="metric-sub">{{ latest_real.period }}, CPI-deflated</div>
+  </div>
+  {% endif %}
+</div>
+
+<p class="note" style="margin-top:14px">
+  <strong>What these numbers are.</strong> Geostat earnings are <strong>gross,
+  before personal income tax</strong>, and are an average over paid employees
+  (earnings fund ÷ average paid employees ÷ months). They are not take-home pay
+  and not a typical person's salary. The mean is pulled up by high earners, which
+  is why the median is shown next to it.
+</p>
+
+<section class="section">
+  <div class="section-head">
+    <h2>The trap: four currencies in one row of columns</h2>
+    <span class="pill pill-fail pill-plain">the reason this project exists</span>
+  </div>
+  <p class="muted" style="max-width:76ch">
+    The annual earnings workbook carries a footnote:
+    <em>&ldquo;Currency &mdash; before 1993 Rouble; 1993 Coupon; 1994 Thousand
+    Coupon; since 1995 Lari.&rdquo;</em> The columns are therefore not one series.
+    Plot them naively and 1995 looks like a 99.8% wage collapse. It was a currency
+    reform. GeoStats tags every value with the currency actually in force that
+    year, the <code>CURRENCY_ERA</code> contract fails any series that mixes eras
+    under one label, and the explorer defaults to the Lari era.
+  </p>
+  <div class="compare">
+    <div class="card bad">
+      <h3 style="margin-bottom:8px">Naive: every published column as one line</h3>
+      {{ m.chart(naive_chart) }}
+      <p class="small" style="margin-top:10px;color:var(--fail)">
+        Meaningless. The 1993 spike is 27,950 Coupons sitting next to 13.5 Lari.
+      </p>
+    </div>
+    <div class="card good">
+      <h3 style="margin-bottom:8px">Honest: Lari era only, 1995 onward</h3>
+      {{ m.chart(honest_chart) }}
+      <p class="small" style="margin-top:10px;color:var(--pass)">
+        One currency, one comparable series. This is the default everywhere else.
+      </p>
+    </div>
+  </div>
+
+  <div class="card card-tight" style="margin-top:14px">
+    <div class="card-head"><h3>The handover years, as published</h3>
+      <span class="tag">earnings_annual · breakdown total</span></div>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr><th>{{ t('m.year') }}</th><th class="num">{{ t('m.value') }}</th>
+          <th>{{ t('m.unit') }}</th><th>Currency</th></tr></thead>
+        <tbody>
+        {% for r in era_rows %}
+          <tr>
+            <td class="mono">{{ r.period }}</td>
+            <td class="num">{{ m.num(r.value) }}</td>
+            <td><span class="tag">{{ r.unit }}</span></td>
+            <td>{{ currency_name(r.unit) }}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="4"><div class="empty">No handover years in this vintage.</div></td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-head"><h2>Nominal against real, {{ base_year }} = 100</h2>
+    <a class="btn btn-sm" href="/explorer{{ '?lang=' ~ lang if lang != 'en' else '' }}">Open the explorer</a></div>
+  <div class="card">
+    {{ m.chart(real_chart) }}
+    <p class="note" style="margin:14px 0 0">
+      <strong>Why two lines.</strong> The distance between them is inflation.
+      Real index = (nominal<sub>t</sub> / nominal<sub>base</sub>) ÷
+      (CPI<sub>t</sub> / CPI<sub>base</sub>) × 100, using the Geostat CPI with
+      2010 annual average = 100. The CPI annual average is derived here from the
+      twelve published monthly indices, and only for years where all twelve are
+      present. That is why the real line starts at {{ cpi_first }} even though
+      nominal earnings go back to {{ wage_first }}.
+    </p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-head"><h2>Provenance at a glance</h2>
+    <a class="btn btn-sm" href="/reliability{{ '?lang=' ~ lang if lang != 'en' else '' }}">Reliability detail</a></div>
+  <div class="grid grid-4">
+    <div class="metric"><div class="metric-label">{{ t('q.datasets') }}</div>
+      <div class="metric-value sm">{{ summary.datasets }}</div>
+      <div class="metric-sub">ingested from Geostat</div></div>
+    <div class="metric"><div class="metric-label">{{ t('q.vintages') }}</div>
+      <div class="metric-value sm">{{ summary.vintages }}</div>
+      <div class="metric-sub">immutable retrievals on disk</div></div>
+    <div class="metric"><div class="metric-label">{{ t('q.observations') }}</div>
+      <div class="metric-value sm">{{ '{:,}'.format(summary.observations) }}</div>
+      <div class="metric-sub">long-format rows indexed</div></div>
+    <div class="metric"><div class="metric-label">{{ t('q.pass_rate') }}</div>
+      <div class="metric-value sm {{ 'is-pass' if totals.failed == 0 else 'is-warn' }}">{{ '%.0f'|format(totals.rate) }}%</div>
+      <div class="metric-sub">{{ totals.passed }}/{{ totals.total }} contract checks on latest vintages</div></div>
+  </div>
+  {{ m.provenance([
+      ('dataset', 'earnings_annual'),
+      ('vintage', vintage_id),
+      ('source', source_url),
+  ]) }}
+  <p class="small faint" style="margin-top:10px">
+    Source pages: <a href="{{ source_page }}">{{ source_page }}</a>
+  </p>
+</section>
+{% endblock %}

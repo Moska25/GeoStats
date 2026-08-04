@@ -1,0 +1,117 @@
+{% extends "_layout.html" %}
+{% import "_macros.html" as m %}
+{% block title %}{{ t('page.reliability') }}{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <h1>{{ t('page.reliability') }}</h1>
+  <p class="lede">One card per dataset: what was retrieved, when, from where, its
+    checksum, and which data contracts it passes. Refreshing fetches live from
+    Geostat and writes a new vintage rather than replacing the old one.</p>
+</div>
+
+{% if refreshed %}
+<p class="note {{ 'note-warn' if 'failed' in refreshed else '' }}">{{ refreshed }}</p>
+{% endif %}
+
+<div class="grid grid-4">
+  <div class="metric"><div class="metric-label">{{ t('q.datasets') }}</div>
+    <div class="metric-value sm">{{ summary.datasets }}</div></div>
+  <div class="metric"><div class="metric-label">{{ t('q.vintages') }}</div>
+    <div class="metric-value sm">{{ summary.vintages }}</div>
+    <div class="metric-sub">never overwritten</div></div>
+  <div class="metric"><div class="metric-label">{{ t('q.observations') }}</div>
+    <div class="metric-value sm">{{ '{:,}'.format(summary.observations) }}</div></div>
+  <div class="metric"><div class="metric-label">{{ t('q.pass_rate') }}</div>
+    <div class="metric-value sm {{ 'is-pass' if totals.failed == 0 else 'is-warn' }}">{{ '%.0f'|format(totals.rate) }}%</div>
+    <div class="metric-sub">{{ totals.passed }}/{{ totals.total }} on latest vintages</div></div>
+</div>
+
+<p class="note" style="margin-top:14px">
+  <strong>The failing checks are real and deliberate.</strong> The
+  <code>JOIN</code> contract fails on three wage datasets because the CPI series
+  begins in 2000 while earnings go back to 1995: those five years genuinely
+  cannot be deflated. Tuning the check until the dashboard is all green would
+  hide a limitation the analytics have to respect.
+</p>
+
+<section class="section">
+{% for card in cards %}
+  <div class="card card-tight" style="margin-bottom:14px">
+    <div class="card-head">
+      <h2><a href="/reliability/{{ card.dataset_id }}{{ qs }}">{{ card.adapter.title }}</a></h2>
+      {% if not card.empty %}
+      <span class="row">
+        <span class="pill {{ 'pill-pass' if card.passed == card.total else 'pill-warn' }}">
+          {{ card.passed }}/{{ card.total }} {{ t('q.checks') }}</span>
+        <span class="tag">{{ card.vintage_count }} {{ t('q.vintages')|lower }}</span>
+      </span>
+      {% endif %}
+    </div>
+    {% if card.empty %}
+    <div class="card-body"><div class="empty">No vintage committed for this dataset.</div></div>
+    {% else %}
+    <div class="card-body">
+      <p class="small muted" style="margin-bottom:14px">{{ card.adapter.note }}</p>
+      <dl class="kv">
+        <dt>Latest period</dt><dd>{{ card.latest_period }}</dd>
+        <dt>{{ t('q.retrieved') }}</dt><dd>{{ card.meta.retrieved_at }}</dd>
+        <dt>{{ t('q.vintage') }}</dt><dd>{{ card.meta.vintage_id }}</dd>
+        <dt>sha256</dt><dd>{{ card.meta.sha256 }}</dd>
+        <dt>Bytes / {{ t('q.rows')|lower }}</dt><dd>{{ '{:,}'.format(card.meta.byte_size) }} / {{ '{:,}'.format(card.meta.row_count) }}</dd>
+        <dt>HTTP</dt><dd>{{ card.meta.http_status }}</dd>
+        <dt>{{ t('q.preliminary') }}</dt>
+        <dd>{% if card.preliminary %}{{ card.preliminary|join(', ') }}{% else %}none{% endif %}</dd>
+        <dt>{{ t('q.source') }}</dt><dd><a href="{{ card.meta.source_url }}">{{ card.meta.source_url }}</a></dd>
+      </dl>
+      <div class="row" style="margin-top:14px">
+        <div class="bar {{ 'bar-pass' if card.passed == card.total else 'bar-warn' }}" style="flex:1 1 200px">
+          <span style="width: {{ card.rate }}%"></span>
+        </div>
+        <span class="small faint">{{ '%.0f'|format(card.rate) }}% {{ t('q.pass_rate')|lower }}</span>
+      </div>
+      <div class="row" style="margin-top:14px">
+        <a class="btn btn-sm" href="/reliability/{{ card.dataset_id }}{{ qs }}">Vintages and diffs</a>
+        <form method="post" action="/refresh" style="display:inline">
+          <input type="hidden" name="dataset_id" value="{{ card.dataset_id }}">
+          <button class="btn btn-sm" type="submit">{{ t('q.refresh') }}</button>
+        </form>
+      </div>
+      {% set failing = card.checks | rejectattr('passed') | list %}
+      {% if failing %}
+      <div class="hr"></div>
+      {% for c in failing %}
+        <p class="small" style="margin-bottom:6px"><span class="pill pill-fail">{{ c.code }}</span>
+          <span class="muted">{{ c.message }}</span></p>
+      {% endfor %}
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+{% else %}
+  <div class="empty">No datasets registered.</div>
+{% endfor %}
+</section>
+
+<section class="section">
+  <div class="section-head"><h2>The contract suite</h2>
+    <span class="tag">{{ contracts|length }} checks, run against every vintage</span></div>
+  <div class="card card-tight">
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr><th>Code</th><th>Check</th><th>Why it exists</th></tr></thead>
+        <tbody>
+        {% for c in contracts %}
+          <tr><td class="mono">{{ c.code }}</td><td class="wrap">{{ c.title }}</td>
+            <td class="wrap muted">{{ c.why }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <p class="small faint" style="margin-top:10px">
+    Every one of these is exercised by the <a href="/lab{{ qs }}">fault lab</a>,
+    which injects the specific defect each check is designed to catch.
+  </p>
+</section>
+{% endblock %}

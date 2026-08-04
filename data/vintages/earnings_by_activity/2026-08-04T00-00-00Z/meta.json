@@ -1,0 +1,17 @@
+{
+  "dataset_id": "earnings_by_activity",
+  "vintage_id": "2026-08-04T00-00-00Z",
+  "title": "Average monthly nominal earnings by economic activity",
+  "source_url": "https://geostat.ge/media/73900/02_Earnings-by-activity_annual.xlsx",
+  "source_page": "https://www.geostat.ge/en/modules/categories/39/wages",
+  "retrieved_at": "2026-08-04T00:00:00+00:00",
+  "http_status": 200,
+  "byte_size": 22179,
+  "sha256": "80c593c6a74cce65449f9742fd9713e006eac8bc3c1cf341c9054e6d70c4c874",
+  "row_count": 572,
+  "period_grain": "annual",
+  "unit_family": "currency_era",
+  "note": "The 2006 column carries a methodology footnote: the drop in Financial intermediation is a coverage change, not a wage fall.",
+  "user_agent": "browser User-Agent required; Geostat returns 0 bytes without one",
+  "retrieval_via": "direct fetch from geostat.ge"
+}

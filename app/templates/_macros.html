@@ -1,0 +1,40 @@
+{% macro chart(c, legend=true) %}
+{% if c.empty %}
+<div class="empty">Nothing to plot for this selection.</div>
+{% else %}
+<svg class="chart" viewBox="0 0 {{ c.width }} {{ c.height }}" role="img"
+     preserveAspectRatio="xMidYMid meet">
+  {% for y, label in c.y_ticks %}
+  <line class="grid-line" x1="46" y1="{{ '%.2f'|format(y) }}" x2="{{ c.width - 12 }}" y2="{{ '%.2f'|format(y) }}"></line>
+  <text class="axis-text" x="41" y="{{ '%.2f'|format(y + 3) }}" text-anchor="end">{{ label }}</text>
+  {% endfor %}
+  {% for x, label in c.x_ticks %}
+  <text class="axis-text" x="{{ '%.2f'|format(x) }}" y="{{ c.height - 8 }}" text-anchor="middle">{{ label }}</text>
+  {% endfor %}
+  {% for line in c.lines %}
+  <path class="series" d="{{ line.path }}" stroke="{{ line.colour }}"></path>
+  {% endfor %}
+</svg>
+{% if legend %}
+<div class="chart-legend">
+  {% for line in c.lines %}
+  <span class="key"><span class="swatch" style="background: {{ line.colour }}"></span>{{ line.label }}</span>
+  {% endfor %}
+</div>
+{% endif %}
+{% endif %}
+{% endmacro %}
+
+{% macro num(value, places=2) %}{% if value is none %}<span class="faint">n/a</span>{% else %}{{ '{:,.{}f}'.format(value, places) }}{% endif %}{% endmacro %}
+
+{% macro pill(passed, skipped=false) %}
+{% if skipped %}<span class="pill pill-idle">not evaluated</span>
+{% elif passed %}<span class="pill pill-pass">pass</span>
+{% else %}<span class="pill pill-fail">fail</span>{% endif %}
+{% endmacro %}
+
+{% macro provenance(items) %}
+<div class="prov">
+  {% for label, value in items %}<span><b>{{ label }}</b> <span class="val">{{ value }}</span></span>{% endfor %}
+</div>
+{% endmacro %}

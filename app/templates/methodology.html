@@ -1,0 +1,188 @@
+{% extends "_layout.html" %}
+{% import "_macros.html" as m %}
+{% block title %}{{ t('page.methodology') }}{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <h1>{{ t('page.methodology') }}</h1>
+  <p class="lede">Definitions, formulas, the currency-era warning, the honest
+    limitations, and the full source catalogue. Read this before quoting any
+    number from this application.</p>
+</div>
+
+<section class="section">
+  <div class="section-head"><h2>What the earnings figures actually measure</h2></div>
+  <div class="card">
+    <p><strong>Gross, before personal income tax.</strong> Nothing in GeoStats is
+    take-home pay. Converting to net would need each year's income-tax and
+    pension-contribution rules, which this project does not model.</p>
+    <p><strong>An average over paid employees.</strong> Geostat computes it as the
+    earnings fund divided by the average number of paid employees divided by the
+    number of months. It is not the salary of a typical person: it excludes the
+    self-employed and the unemployed entirely, and it averages over everyone who
+    is on a payroll.</p>
+    <p><strong>Mean and median come from different sources.</strong> The mean is
+    from the enterprise survey. The median is from Revenue Service administrative
+    records and only starts in 2018. They are shown side by side because the gap
+    between them is the point: the mean is dragged upward by high earners, so it
+    always sits above the middle earner. If someone asks "what does a normal job
+    pay", the median is the closer answer, and neither is take-home.</p>
+    <p style="margin-bottom:0"><strong>No distribution is published.</strong> A
+    mean and a median cannot be inverted into percentiles. The
+    <a href="/ask{{ '?lang=' ~ lang if lang != 'en' else '' }}">analyst</a>
+    refuses those questions rather than modelling an answer.</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-head">
+    <h2>The currency-era warning</h2>
+    <span class="pill pill-fail pill-plain">read this one</span>
+  </div>
+  <div class="card">
+    <p>The annual earnings workbook carries this footnote under the title:</p>
+    <div class="formula">*Currency - before 1993 -Rouble; 1993 - Coupon; 1994 - Thousand Coupon; since 1995 - Lari.</div>
+    <p style="margin-top:12px">Columns from {{ wage_first }} to 1994 are therefore
+    denominated in three currencies that no longer exist, and only
+    {{ gel_era_start }} onward is in Lari. The columns sit adjacent in a single
+    sheet row with no visual break. Reading the sheet as one series produces a
+    1995 figure of 13.5 next to a 1994 figure of 6,151.6 &mdash; an apparent
+    99.8% collapse in wages that is entirely a redenomination.</p>
+    <p>GeoStats handles it in three places:</p>
+    <ul class="muted" style="padding-left:20px">
+      <li>the parser tags every value with the currency in force in that year
+        (<code>adapters.currency_for_year</code>), so the unit is part of the
+        composite key;</li>
+      <li>the <code>CURRENCY_ERA</code> contract fails any series that carries
+        more than one era under one unit label, and the fault lab has a
+        <em>Mislabel the currency era</em> injection that proves it fires;</li>
+      <li>the explorer defaults to {{ gel_era_start }} onward and warns loudly if
+        you widen the range past the boundary.</li>
+    </ul>
+    <p style="margin-bottom:0">There is no conversion factor in these files, and
+    GeoStats will not invent one. Pre-1995 values are shown in their own currency
+    or not at all.</p>
+  </div>
+
+  <div class="card card-tight" style="margin-top:14px">
+    <div class="card-head"><h3>Every published period and its currency</h3>
+      <span class="tag">{{ era_rows|length }} periods, from the committed vintage</span></div>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr><th>{{ t('m.year') }}</th><th class="num">{{ t('m.value') }}</th>
+          <th>{{ t('m.unit') }}</th><th>Currency</th></tr></thead>
+        <tbody>
+        {% for r in era_rows %}
+          <tr class="{{ '' if r.unit == 'GEL' else '' }}">
+            <td class="mono">{{ r.period }}</td>
+            <td class="num">{{ m.num(r.value) }}</td>
+            <td><span class="tag">{{ r.unit }}</span></td>
+            <td>{% if r.unit == 'GEL' %}<span class="pill pill-pass">{{ currency_name(r.unit) }}</span>
+                {% else %}<span class="pill pill-fail">{{ currency_name(r.unit) }}</span>{% endif %}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="4"><div class="empty">No periods in this vintage.</div></td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-head"><h2>Formulas</h2>
+    <span class="tag">app/metrics.py, unit-tested</span></div>
+  <div class="card card-tight">
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr><th>Function</th><th>Formula</th></tr></thead>
+        <tbody>
+        {% for name, formula in approved %}
+          <tr><td class="mono">{{ name }}</td><td class="mono wrap">{{ formula }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <p class="note" style="margin-top:14px">
+    <strong>CPI base and rebasing.</strong> The price index used throughout is
+    Geostat's consumer price index with <strong>2010 annual average = 100</strong>.
+    GeoStats derives an annual average by taking the arithmetic mean of the twelve
+    published monthly indices, and only for years where all twelve months exist
+    &mdash; a partial year would understate the average and silently bias every
+    real figure. The derivation is checkable: it returns exactly 100.0 for 2010,
+    which is the base year by construction. Coverage runs
+    {{ cpi_first }}&ndash;{{ cpi_last }}. Deflating to a different base year is a
+    rebasing, not a recomputation: the explorer's base-year selector divides
+    through by a different CPI value and leaves the underlying series alone.
+  </p>
+</section>
+
+<section class="section">
+  <div class="section-head"><h2>Data contracts</h2>
+    <span class="tag">{{ contracts|length }} checks</span></div>
+  <div class="card card-tight">
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr><th>Code</th><th>Check</th><th>Why it exists</th></tr></thead>
+        <tbody>
+        {% for c in contracts %}
+          <tr><td class="mono">{{ c.code }}</td><td class="wrap">{{ c.title }}</td>
+            <td class="wrap muted">{{ c.why }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-head"><h2>Source catalogue</h2>
+    <span class="tag">{{ adapters|length }} datasets · {{ summary.vintages }} vintages · {{ '{:,}'.format(summary.observations) }} observations</span></div>
+  {% for a in adapters %}
+  <div class="card" style="margin-bottom:10px">
+    <h3 style="margin-bottom:6px">{{ a.title }}</h3>
+    <p class="small muted" style="margin-bottom:10px">{{ a.note }}</p>
+    <dl class="kv">
+      <dt>File</dt><dd><a href="{{ a.url }}">{{ a.url }}</a></dd>
+      <dt>Page</dt><dd><a href="{{ a.source_page }}">{{ a.source_page }}</a></dd>
+      <dt>Grain</dt><dd>{{ a.period_grain }}</dd>
+      <dt>Units</dt><dd>{{ a.unit_family }}</dd>
+    </dl>
+  </div>
+  {% endfor %}
+</section>
+
+<section class="section">
+  <div class="section-head"><h2>Limitations</h2></div>
+  <div class="card">
+    <ul class="muted" style="padding-left:20px;margin:0">
+      <li>Earnings before 1995 are in Rouble, Coupon or Thousand Coupon and are
+        not comparable with anything after; no conversion is applied.</li>
+      <li>The CPI series starts in {{ cpi_first }}, so wage years
+        {{ wage_first }}&ndash;1999 cannot be deflated at all. The
+        <code>JOIN</code> contract fails on exactly those years rather than
+        pretending they are covered.</li>
+      <li>The median series starts in 2018 and is published by economic activity
+        only &mdash; never by region, sex or ownership.</li>
+      <li>Earnings by activity exist under two incompatible classifications
+        (NACE rev.1 to 2019, NACE rev.2 from 2014). GeoStats keeps them as
+        separate breakdowns and does not splice them.</li>
+      <li>Regional figures place enterprises at the head-office location, which
+        overstates Tbilisi relative to where work is physically done.</li>
+      <li>The 2006 column in the activity and sex files carries a methodology
+        footnote about financial-sector coverage; the drop there is a definition
+        change, not a wage fall.</li>
+      <li>The latest annual earnings figure is marked <strong>**</strong>,
+        preliminary. It is expected to be revised.</li>
+      <li>Only the headline Total line of the year-on-year CPI file is ingested;
+        the full COICOP tree is not.</li>
+      <li>Employment, unemployment and the quarterly earnings releases are not
+        ingested at all.</li>
+      <li>Georgian covers {{ '%.0f'|format(ka_coverage * 100) }}% of the interface
+        strings. Explanatory prose stays in English deliberately &mdash; a
+        half-correct translation of a statistical caveat is worse than none.</li>
+    </ul>
+  </div>
+</section>
+{% endblock %}

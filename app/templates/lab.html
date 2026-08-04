@@ -1,0 +1,117 @@
+{% extends "_layout.html" %}
+{% import "_macros.html" as m %}
+{% block title %}{{ t('page.lab') }}{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <h1>{{ t('page.lab') }}</h1>
+  <p class="lede">Inject a defect into a copy of a committed vintage and watch
+    which contract catches it. The copy lives in <code>data/cache/lab/</code>;
+    the committed vintage is checksummed before and after every run to prove it
+    was not touched.</p>
+</div>
+
+<p class="note">
+  <strong>A contract you have never seen fail is a contract you have not tested.</strong>
+  Each fault below imitates a real ingestion mistake and targets exactly one
+  check. The test suite runs all {{ faults|length }} of them and asserts both
+  that the fault is caught and that the committed vintage is unchanged.
+</p>
+
+<form class="card" method="get" action="/lab">
+  {% if lang != 'en' %}<input type="hidden" name="lang" value="{{ lang }}">{% endif %}
+  <div class="toolbar">
+    <div class="field">
+      <label for="dataset_id">{{ t('q.dataset') }}</label>
+      <select id="dataset_id" name="dataset_id">
+        {% for did, ad in datasets %}
+        <option value="{{ did }}" {{ 'selected' if did == dataset_id }}>{{ did }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button class="btn" type="submit">Change dataset</button>
+    <span class="small faint">target vintage <span class="tag">{{ vintage_id }}</span></span>
+  </div>
+</form>
+
+<section class="section">
+  <div class="section-head"><h2>Faults</h2>
+    <span class="tag">one per contract</span></div>
+  <div class="fault-list">
+    {% for f in faults %}
+    <a class="fault {{ 'active' if f.fault_id == fault_id }}"
+       href="/lab?dataset_id={{ dataset_id }}&amp;fault_id={{ f.fault_id }}{{ '&lang=' ~ lang if lang != 'en' else '' }}">
+      <div class="fault-name">{{ f.name }}</div>
+      <div class="fault-why">{{ f.real_world }}</div>
+      <div style="margin-top:8px"><span class="tag">targets {{ f.targets }}</span></div>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+
+{% if result %}
+<section class="section">
+  <div class="section-head">
+    <h2>Result: {{ result.fault_name }}</h2>
+    {% if result.caught_by_target %}
+      <span class="pill pill-pass">caught by {{ result.targets }}</span>
+    {% elif result.caught %}
+      <span class="pill pill-warn">caught, but by a different contract</span>
+    {% else %}
+      <span class="pill pill-fail">not caught</span>
+    {% endif %}
+  </div>
+
+  <div class="grid grid-4">
+    <div class="metric"><div class="metric-label">Rows affected</div>
+      <div class="metric-value sm">{{ result.diff.changed|length + result.diff.added|length + result.diff.removed|length }}</div>
+      <div class="metric-sub">{{ result.diff.changed|length }} revised ·
+        {{ result.diff.added|length }} added · {{ result.diff.removed|length }} removed</div></div>
+    <div class="metric"><div class="metric-label">Contracts tripped</div>
+      <div class="metric-value sm {{ 'is-pass' if result.newly_failed else 'is-fail' }}">{{ result.newly_failed|length }}</div>
+      <div class="metric-sub">{{ result.newly_failed|join(', ') or 'none' }}</div></div>
+    <div class="metric"><div class="metric-label">Gated downstream</div>
+      <div class="metric-value sm">{{ result.gated|length }}</div>
+      <div class="metric-sub">not evaluated after a schema break</div></div>
+    <div class="metric"><div class="metric-label">Committed vintage</div>
+      <div class="metric-value sm {{ 'is-pass' if result.vintage_unchanged else 'is-fail' }}">
+        {{ 'intact' if result.vintage_unchanged else 'MUTATED' }}</div>
+      <div class="metric-sub">sha256 compared before and after</div></div>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <h3 style="margin-bottom:8px">What was injected</h3>
+    <p style="margin-bottom:12px">{{ result.description }}</p>
+    <h3 style="margin-bottom:8px">Contract results after injection</h3>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr><th>Code</th><th>Check</th><th>Status</th><th>Message</th></tr></thead>
+        <tbody>
+        {% for c in result.results_after %}
+          <tr>
+            <td class="mono">{{ c.code }}</td>
+            <td class="wrap">{{ c.title }}</td>
+            <td>
+              {% if c.skipped %}<span class="pill pill-idle">gated</span>
+              {% elif c.code in result.newly_failed %}<span class="pill pill-fail">newly failed</span>
+              {% elif c.passed %}<span class="pill pill-pass">pass</span>
+              {% else %}<span class="pill pill-warn">already failing</span>{% endif %}
+            </td>
+            <td class="wrap muted">{{ c.message }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <h3 style="margin-bottom:10px">Defect report</h3>
+    <pre>{{ report }}</pre>
+  </div>
+</section>
+{% else %}
+<div class="empty" style="margin-top:14px">Pick a fault above to inject it into a copy of
+  <span class="mono">{{ dataset_id }}</span> / <span class="mono">{{ vintage_id }}</span>.</div>
+{% endif %}
+{% endblock %}

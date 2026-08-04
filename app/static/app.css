@@ -1,0 +1,113 @@
+/* GeoStats - project accent plus the few rules base.css does not cover. */
+
+:root { --accent: #3b82f6; }
+
+/* language toggle in the top bar */
+.lang { display: flex; gap: 2px; margin-left: auto; flex: none; }
+.lang a {
+  padding: 4px 9px;
+  border-radius: var(--r-sm);
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--text-muted);
+}
+.lang a:hover { background: var(--surface-2); color: var(--text); text-decoration: none; }
+.lang a.active { background: var(--accent-dim); color: var(--accent-text); }
+
+/* inline SVG charts */
+.chart { width: 100%; height: auto; display: block; }
+.chart .grid-line { stroke: var(--border); stroke-width: 1; }
+.chart .axis-text { fill: var(--text-faint); font-size: 10px; font-family: var(--mono); }
+.chart .series { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chart-legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 8px; font-size: 12px; color: var(--text-muted); }
+.chart-legend .key { display: inline-flex; align-items: center; gap: 6px; }
+.chart-legend .swatch { width: 14px; height: 3px; border-radius: 2px; }
+
+/* side-by-side comparison of the naive and the honest series */
+.compare { display: grid; gap: 14px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.compare .bad { border-color: color-mix(in srgb, var(--fail) 40%, var(--border)); }
+.compare .good { border-color: color-mix(in srgb, var(--pass) 40%, var(--border)); }
+@media (max-width: 760px) { .compare { grid-template-columns: minmax(0, 1fr); } }
+
+/* provenance strip under every computed number */
+.prov {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--text-faint);
+  padding: 10px 0 0;
+  border-top: 1px solid var(--border);
+  margin-top: 14px;
+}
+/* Flex items refuse to shrink below their content, so a long unbreakable value
+   (sha256, archive URL, vintage id) pushed the page past the viewport at 375px. */
+.prov > span { min-width: 0; overflow-wrap: anywhere; }
+.prov b { color: var(--text-muted); font-weight: 500; }
+.prov .val { color: var(--text); }
+
+/* formula callout */
+.formula {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 10px 13px;
+  color: var(--text);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* answer / refusal blocks */
+.answer { border-left: 2px solid var(--pass); }
+.refusal { border-left: 2px solid var(--warn); }
+.unmatched { border-left: 2px solid var(--idle); }
+.answer, .refusal, .unmatched {
+  background: var(--surface);
+  border-radius: 0 var(--r) var(--r) 0;
+  padding: 16px 20px;
+}
+.answer + .answer, .refusal + .refusal,
+.answer + .refusal, .refusal + .answer,
+.unmatched + .answer, .answer + .unmatched { margin-top: 12px; }
+.answer-head { font-size: 15px; color: var(--text); font-weight: 550; margin-bottom: 8px; }
+
+/* key/value list */
+.kv { display: grid; grid-template-columns: max-content 1fr; gap: 6px 18px; font-size: 13px; }
+.kv dt { color: var(--text-faint); }
+.kv dd { margin: 0; font-family: var(--mono); color: var(--text); overflow-wrap: anywhere; }
+@media (max-width: 560px) { .kv { grid-template-columns: minmax(0, 1fr); gap: 2px 0; } .kv dd { margin-bottom: 8px; } }
+
+/* fault list */
+.fault-list { display: grid; gap: 10px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 900px) { .fault-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .fault-list { grid-template-columns: minmax(0, 1fr); } }
+.fault {
+  display: block;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 13px 15px;
+  color: var(--text);
+}
+.fault:hover { border-color: var(--border-strong); background: var(--surface-2); text-decoration: none; }
+.fault.active { border-color: var(--accent); background: var(--accent-dim); }
+.fault .fault-name { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
+.fault .fault-why { font-size: 12px; color: var(--text-muted); }
+
+/* long labels in tables must not force a horizontal page scroll */
+td.wrap { white-space: normal; min-width: 160px; }
+
+.tag {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-faint);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 6px;
+  white-space: nowrap;
+}

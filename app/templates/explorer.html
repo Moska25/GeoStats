@@ -1,0 +1,126 @@
+{% extends "_layout.html" %}
+{% import "_macros.html" as m %}
+{% block title %}{{ t('page.explorer') }}{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <h1>{{ t('page.explorer') }}</h1>
+  <p class="lede">Nominal, CPI-deflated real, and median earnings side by side.
+    The year range defaults to the Lari era ({{ gel_era_start }} onward) because
+    earlier columns are denominated in three other currencies.</p>
+</div>
+
+<form class="card" method="get" action="/explorer">
+  {% if lang != 'en' %}<input type="hidden" name="lang" value="{{ lang }}">{% endif %}
+  <div class="toolbar">
+    <div class="field">
+      <label for="breakdown">Breakdown</label>
+      <select id="breakdown" name="breakdown">
+        {% for code, label in breakdown_choices %}
+        <option value="{{ code }}" {{ 'selected' if code == breakdown }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="year_from">{{ t('m.year') }} from</label>
+      <select id="year_from" name="year_from">
+        {% for y in universe %}<option value="{{ y }}" {{ 'selected' if y == year_from }}>{{ y }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="year_to">{{ t('m.year') }} to</label>
+      <select id="year_to" name="year_to">
+        {% for y in universe %}<option value="{{ y }}" {{ 'selected' if y == year_to }}>{{ y }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="base">Deflation base</label>
+      <select id="base" name="base">
+        {% for y in base_choices %}<option value="{{ y }}" {{ 'selected' if y == base }}>{{ y }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="include_pre_gel">Pre-{{ gel_era_start }} columns</label>
+      <select id="include_pre_gel" name="include_pre_gel">
+        <option value="0" {{ 'selected' if not include_pre_gel }}>Excluded (default)</option>
+        <option value="1" {{ 'selected' if include_pre_gel }}>Included (not comparable)</option>
+      </select>
+    </div>
+    <button class="btn btn-primary" type="submit">Apply</button>
+  </div>
+</form>
+
+{% if mixed_era %}
+<p class="note note-warn" style="margin-top:14px">
+  <strong>This selection mixes currency eras.</strong> It spans
+  {% for u in units %}<span class="tag">{{ u }}</span> {% endfor %}
+  &mdash; {{ units|map('length')|list|length }} different currencies. The line below
+  is drawn because you asked for it, but the values are not comparable and no
+  growth rate across the boundary means anything. This is exactly the state the
+  <code>CURRENCY_ERA</code> contract fails on.
+</p>
+{% endif %}
+
+<div class="card" style="margin-top:14px">
+  {{ m.chart(chart) }}
+  <p class="note" style="margin:14px 0 0">
+    <strong>Real is nominal with prices removed.</strong> Real GEL =
+    nominal × (CPI<sub>{{ base }}</sub> / CPI<sub>t</sub>), so the real line is
+    stated in {{ base }} prices. Years with no CPI annual average show
+    <span class="faint">n/a</span> rather than being dropped &mdash; a shortened
+    chart hides the gap, a blank cell shows it.
+  </p>
+</div>
+
+<section class="section">
+  <div class="section-head"><h2>Series table</h2>
+    <span class="tag">{{ series|length }} rows</span></div>
+  <div class="card card-tight">
+    <div class="table-wrap">
+      <table class="data">
+        <thead>
+          <tr>
+            <th>{{ t('m.year') }}</th>
+            <th class="num">{{ t('m.nominal') }}</th>
+            <th class="num">Real ({{ base }})</th>
+            <th class="num">{{ t('m.median') }}</th>
+            <th class="num">Nom. index</th>
+            <th class="num">Real index</th>
+            <th class="num">Nom. YoY</th>
+            <th class="num">Real YoY</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for r in series %}
+          <tr>
+            <td class="mono">{{ r.period }}</td>
+            <td class="num">{{ m.num(r.nominal) }}</td>
+            <td class="num">{{ m.num(r.real_gel) }}</td>
+            <td class="num">{{ m.num(r.median) }}</td>
+            <td class="num">{{ m.num(r.nominal_index, 1) }}</td>
+            <td class="num">{{ m.num(r.real_index, 1) }}</td>
+            <td class="num">{% if r.nominal_yoy is not none %}{{ '%+.1f'|format(r.nominal_yoy) }}%{% else %}<span class="faint">n/a</span>{% endif %}</td>
+            <td class="num">{% if r.real_yoy is not none %}{{ '%+.1f'|format(r.real_yoy) }}%{% else %}<span class="faint">n/a</span>{% endif %}</td>
+            <td>
+              {% if r.is_preliminary %}<span class="pill pill-warn">{{ t('q.preliminary') }}</span>
+              {% elif r.cpi is none %}<span class="pill pill-idle">no CPI</span>
+              {% else %}<span class="pill pill-pass">{{ t('q.final') }}</span>{% endif %}
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="9"><div class="empty">No published values in this range.</div></td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {{ m.provenance([
+      ('dataset', 'earnings_annual'),
+      ('breakdown', breakdown),
+      ('vintage', vintage_id),
+      ('CPI', 'cpi_2010_base, annual average of 12 monthly indices'),
+      ('source', source_url),
+  ]) }}
+</section>
+{% endblock %}

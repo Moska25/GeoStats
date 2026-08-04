@@ -1,0 +1,17 @@
+{
+  "dataset_id": "earnings_by_region",
+  "vintage_id": "2026-08-04T00-00-00Z",
+  "title": "Average monthly nominal earnings by region",
+  "source_url": "https://geostat.ge/media/73904/13_Earnings-by-regions_annual.xlsx",
+  "source_page": "https://www.geostat.ge/en/modules/categories/39/wages",
+  "retrieved_at": "2026-08-04T00:00:00+00:00",
+  "http_status": 200,
+  "byte_size": 12667,
+  "sha256": "3d222125b9f013d630a6e96c4e319b5afe2a3a43c1379d117f1d18d00cde9858",
+  "row_count": 180,
+  "period_grain": "annual",
+  "unit_family": "currency_era",
+  "note": "Enterprises are counted at the location of the head office, which inflates Tbilisi relative to where work is done.",
+  "user_agent": "browser User-Agent required; Geostat returns 0 bytes without one",
+  "retrieval_via": "direct fetch from geostat.ge"
+}

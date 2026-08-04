@@ -1,0 +1,17 @@
+{
+  "dataset_id": "cpi_yoy",
+  "vintage_id": "2026-08-04T00-00-00Z",
+  "title": "Consumer price index vs the same month of the previous year",
+  "source_url": "https://geostat.ge/media/81847/consumer-price-index-to-the-same-month-of-previous-year.xlsx",
+  "source_page": "https://www.geostat.ge/en/modules/categories/26/inflation-consumer-price-index",
+  "retrieved_at": "2026-08-04T00:00:00+00:00",
+  "http_status": 200,
+  "byte_size": 844620,
+  "sha256": "6f95f5474e96fcd767831c94286d5aa1e502584caa85ec4f14b5e296305a397f",
+  "row_count": 1753,
+  "period_grain": "monthly",
+  "unit_family": "index_prev_year_100",
+  "note": "Headline annual inflation rate as published monthly. Only the Total line is ingested; the COICOP tree is out of scope.",
+  "user_agent": "browser User-Agent required; Geostat returns 0 bytes without one",
+  "retrieval_via": "direct fetch from geostat.ge"
+}

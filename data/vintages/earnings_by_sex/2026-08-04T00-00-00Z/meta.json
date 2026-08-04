@@ -1,0 +1,17 @@
+{
+  "dataset_id": "earnings_by_sex",
+  "vintage_id": "2026-08-04T00-00-00Z",
+  "title": "Average monthly nominal earnings by economic activity and sex",
+  "source_url": "https://geostat.ge/media/73901/03_Earnings-by-sex_annual.xlsx",
+  "source_page": "https://www.geostat.ge/en/modules/categories/39/wages",
+  "retrieved_at": "2026-08-04T00:00:00+00:00",
+  "http_status": 200,
+  "byte_size": 31184,
+  "sha256": "8b7da6d2b9355844cd21e977c75cd29ec6cd083a132fd75d43ae13d2a448f129",
+  "row_count": 1112,
+  "period_grain": "annual",
+  "unit_family": "currency_era",
+  "note": "Two activity classifications. NACE rev.1 covers 1999-2019, NACE rev.2 covers 2014-2024; they are not splice-compatible.",
+  "user_agent": "browser User-Agent required; Geostat returns 0 bytes without one",
+  "retrieval_via": "direct fetch from geostat.ge"
+}
