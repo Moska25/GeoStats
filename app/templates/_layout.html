@@ -8,21 +8,29 @@
 <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
+<a class="skip" href="#main">Skip to content</a>
 <header class="topbar"><div class="topbar-inner">
   <a class="brand" href="/"><span class="brand-mark"></span>{{ project_name }}
     <span class="brand-sub">{{ project_tagline }}</span></a>
-  <nav class="nav">
+  <nav class="nav" aria-label="Sections">
     {% for href, label in nav %}
     <a href="{{ href }}{{ '?lang=' ~ lang if lang != 'en' else '' }}" class="{{ 'active' if active == href else '' }}">{{ label }}</a>
     {% endfor %}
   </nav>
   <div class="lang">
     {% for code, name in languages.items() %}
-    <a href="?lang={{ code }}" class="{{ 'active' if lang == code else '' }}" hreflang="{{ code }}">{{ code|upper }}</a>
+    <a href="?lang={{ code }}" class="{{ 'active' if lang == code else '' }}" hreflang="{{ code }}"
+       lang="{{ code }}" aria-label="{{ name }}">{{ code|upper }}</a>
     {% endfor %}
   </div>
-</div></header>
-<main class="container">
+</div>
+<div class="dateline"><div class="dateline-inner">
+  <span>{{ t('q.retrieved') }} {{ edition_date }}</span>
+  <span>{{ edition_vintages }} {{ t('q.vintages')|lower }}</span>
+  <span class="dateline-source">{{ footer_note }}</span>
+</div></div>
+</header>
+<main class="container" id="main">
 {% if lang_note %}<p class="note note-warn">{{ lang_note }}</p>{% endif %}
 {% block content %}{% endblock %}
 </main>

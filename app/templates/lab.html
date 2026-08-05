@@ -82,9 +82,18 @@
   <div class="card" style="margin-top:14px">
     <h3 style="margin-bottom:8px">What was injected</h3>
     <p style="margin-bottom:12px">{{ result.description }}</p>
-    <h3 style="margin-bottom:8px">Contract results after injection</h3>
+  </div>
+
+  <div style="margin-top:14px">
+  {% call m.exhibit(1, 'Contract results after injecting ' ~ result.fault_name|lower,
+      kind='Table',
+      source='Run against a writable copy of ' ~ dataset_id ~ ' vintage ' ~ vintage_id ~
+             ' under data/cache/lab. The committed vintage was checksummed before ' ~
+             'and after and is ' ~ ('intact' if result.vintage_unchanged else 'MUTATED') ~ '.') %}
+  <div class="card card-tight">
     <div class="table-wrap">
       <table class="data">
+          <caption class="visually-hidden">Every contract result after the fault was injected into a copy</caption>
         <thead><tr><th>Code</th><th>Check</th><th>Status</th><th>Message</th></tr></thead>
         <tbody>
         {% for c in result.results_after %}
@@ -104,9 +113,14 @@
       </table>
     </div>
   </div>
+  {% endcall %}
+  </div>
 
   <div class="card" style="margin-top:14px">
-    <h3 style="margin-bottom:10px">Defect report</h3>
+    <h3 style="margin-bottom:6px">Defect report</h3>
+    <p class="small muted" style="margin-bottom:10px">Generated from the run
+      above, formatted to be pasted straight into a ticket. Every line in it is
+      produced by <code>faults.defect_report</code>; nothing is written by hand.</p>
     <pre>{{ report }}</pre>
   </div>
 </section>

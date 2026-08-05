@@ -69,7 +69,40 @@ real     = amount × (CPI_{{ year_from }} / CPI_{{ year_to }})
 
 <section class="section">
   <div class="section-head"><h2>Where {{ m.num(amount) }} GEL sits against the published figures</h2></div>
+  {% call m.exhibit(1, 'Two published points and your amount, on one scale from zero',
+      source='Geostat, average monthly nominal earnings, annual (mean, ' ~ compare_year ~
+             '); median monthly earnings (median, ' ~ median_year ~ '). Both gross.') %}
   <div class="card">
+    {% if scale.marks %}
+    <div class="scale">
+      <div class="scale-rail">
+        {% for mk in scale.marks %}
+        <span class="scale-mark {{ 'is-you' if mk.label == 'Your amount' }}"
+              style="left: {{ mk.pct }}%"></span>
+        {% endfor %}
+      </div>
+      <div class="scale-axis">
+        <span>0</span><span>{{ m.num(scale.max, 0) }} GEL</span>
+      </div>
+      <dl class="scale-key">
+        {% for mk in scale.marks %}
+        <div class="{{ 'is-you' if mk.label == 'Your amount' }}">
+          <dt>{{ mk.label }}</dt>
+          <dd>{{ m.num(mk.value) }} GEL</dd>
+        </div>
+        {% endfor %}
+      </dl>
+    </div>
+    {% else %}
+    <div class="empty">No published mean or median to compare against.</div>
+    {% endif %}
+    <p class="footnote">Two published points are not a distribution. Geostat
+      publishes a mean and a median and nothing about the shape between them, so
+      a position on this scale is not a percentile and cannot be read as one.
+      {% if is_preliminary %}The {{ compare_year }} mean is preliminary.{% endif %}</p>
+  </div>
+  {% endcall %}
+  <div class="card" style="margin-top:14px">
     <dl class="kv">
       <dt>Published mean, {{ compare_year }}</dt>
       <dd>{{ m.num(mean_value) }} GEL{% if is_preliminary %} <span class="pill pill-warn">{{ t('q.preliminary') }}</span>{% endif %}</dd>
@@ -100,6 +133,7 @@ real     = amount × (CPI_{{ year_from }} / CPI_{{ year_to }})
   <div class="card card-tight" style="margin-top:14px">
     <div class="table-wrap">
       <table class="data">
+          <caption class="visually-hidden">Consumer price index and the equivalent of the entered amount, year by year</caption>
         <thead><tr><th>{{ t('m.year') }}</th><th class="num">CPI (2010=100)</th>
           <th class="num">Equivalent of {{ m.num(amount) }} GEL</th>
           <th class="num">Cumulative {{ t('m.inflation') }}</th></tr></thead>

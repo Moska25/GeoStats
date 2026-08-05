@@ -1,9 +1,38 @@
-{% macro chart(c, legend=true) %}
+{#
+  A statistical publication numbers its exhibits and states where each one came
+  from. `kind` is "Figure" for charts and "Table" for tabulations; numbering
+  restarts on every page, the way it does in a printed volume.
+#}
+{% macro exhibit(number, title, source=none, kind='Figure') %}
+<figure class="fig">
+  <figcaption class="fig-head">
+    <span class="fig-no">{{ kind }} {{ number }}</span>
+    <span class="fig-title">{{ title }}</span>
+  </figcaption>
+  {{ caller() }}
+  {% if source %}<p class="fig-source"><b>Source</b> {{ source }}</p>{% endif %}
+</figure>
+{% endmacro %}
+
+{% macro legend(c) %}
+<div class="chart-legend">
+  {% for line in c.lines %}
+  <span class="key"><span class="swatch {{ 'swatch-dashed' if line.dashed }}"
+        style="background: {{ line.colour }}"></span>{{ line.label }}</span>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+{% macro chart(c, show_legend=true, bands=none) %}
 {% if c.empty %}
 <div class="empty">Nothing to plot for this selection.</div>
 {% else %}
 <svg class="chart" viewBox="0 0 {{ c.width }} {{ c.height }}" role="img"
      preserveAspectRatio="xMidYMid meet">
+  {% for b in bands or [] if not b.current %}
+  <rect class="era-wash" x="{{ '%.2f'|format(b.x) }}" y="{{ b.y }}"
+        width="{{ '%.2f'|format(b.width) }}" height="{{ b.height }}"></rect>
+  {% endfor %}
   {% for y, label in c.y_ticks %}
   <line class="grid-line" x1="46" y1="{{ '%.2f'|format(y) }}" x2="{{ c.width - 12 }}" y2="{{ '%.2f'|format(y) }}"></line>
   <text class="axis-text" x="41" y="{{ '%.2f'|format(y + 3) }}" text-anchor="end">{{ label }}</text>
@@ -12,16 +41,11 @@
   <text class="axis-text" x="{{ '%.2f'|format(x) }}" y="{{ c.height - 8 }}" text-anchor="middle">{{ label }}</text>
   {% endfor %}
   {% for line in c.lines %}
-  <path class="series" d="{{ line.path }}" stroke="{{ line.colour }}"></path>
+  <path class="series" d="{{ line.path }}" stroke="{{ line.colour }}"
+        {% if line.dashed %}stroke-dasharray="5 4"{% endif %}></path>
   {% endfor %}
 </svg>
-{% if legend %}
-<div class="chart-legend">
-  {% for line in c.lines %}
-  <span class="key"><span class="swatch" style="background: {{ line.colour }}"></span>{{ line.label }}</span>
-  {% endfor %}
-</div>
-{% endif %}
+{% if show_legend %}{{ legend(c) }}{% endif %}
 {% endif %}
 {% endmacro %}
 
@@ -31,6 +55,34 @@
 {% if skipped %}<span class="pill pill-idle">not evaluated</span>
 {% elif passed %}<span class="pill pill-pass">pass</span>
 {% else %}<span class="pill pill-fail">fail</span>{% endif %}
+{% endmacro %}
+
+{% macro era_band(bands, width, name_of) %}
+{% if bands %}
+<svg class="era-band" viewBox="0 0 {{ width }} 22" role="img"
+     preserveAspectRatio="none"
+     aria-label="Currency in force across the plotted years">
+  {% for b in bands %}
+  <rect class="era {{ 'is-current' if b.current }}" x="{{ '%.2f'|format(b.x) }}" y="0"
+        width="{{ '%.2f'|format(b.width) }}" height="16"></rect>
+  <line class="era-edge" x1="{{ '%.2f'|format(b.x) }}" y1="0"
+        x2="{{ '%.2f'|format(b.x) }}" y2="16"></line>
+  {% if b.width >= 44 %}
+  <text class="era-label" x="{{ '%.2f'|format(b.x + b.width / 2) }}" y="12"
+        text-anchor="middle">{{ b.code }}</text>
+  {% endif %}
+  {% endfor %}
+</svg>
+<div class="era-key">
+  {% for b in bands %}
+  <span class="{{ 'is-current' if b.current }}">
+    <span class="era-years">{{ b.first }}{% if b.last != b.first %}&ndash;{{ b.last }}{% endif %}</span>
+    <span class="era-code">{{ b.code }}</span>
+    {{ name_of(b.code) }}
+  </span>
+  {% endfor %}
+</div>
+{% endif %}
 {% endmacro %}
 
 {% macro provenance(items) %}

@@ -20,6 +20,7 @@ EN: dict[str, str] = {
     "tagline": "Revision-aware Georgian labour statistics",
     "nav.overview": "Overview",
     "nav.explorer": "Explorer",
+    "nav.regions": "Regions",
     "nav.salary": "Salary",
     "nav.reliability": "Reliability",
     "nav.ask": "Ask",
@@ -31,6 +32,7 @@ EN: dict[str, str] = {
     # page titles
     "page.overview": "Overview",
     "page.explorer": "Series explorer",
+    "page.regions": "Regional earnings",
     "page.salary": "Salary and purchasing power",
     "page.reliability": "Dataset reliability",
     "page.ask": "Grounded analyst",
@@ -96,6 +98,7 @@ KA: dict[str, str] = {
     "tagline": "ქართული შრომის სტატისტიკა ვერსიების აღრიცხვით",
     "nav.overview": "მიმოხილვა",
     "nav.explorer": "მაჩვენებლები",
+    "nav.regions": "რეგიონები",
     "nav.salary": "ხელფასი",
     "nav.reliability": "სანდოობა",
     "nav.ask": "კითხვა",
@@ -106,6 +109,7 @@ KA: dict[str, str] = {
 
     "page.overview": "მიმოხილვა",
     "page.explorer": "მაჩვენებლები",
+    "page.regions": "რეგიონები",
     "page.salary": "ხელფასი და მსყიდველობითი უნარი",
     "page.reliability": "მონაცემების სანდოობა",
     "page.ask": "ანალიტიკოსი",

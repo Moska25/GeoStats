@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 
 from fastapi import FastAPI, Form, Query, Request
+from fastapi.exceptions import HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -35,6 +36,7 @@ REGION_DATASET = "earnings_by_region"
 NAV = [
     ("/", "nav.overview"),
     ("/explorer", "nav.explorer"),
+    ("/regions", "nav.regions"),
     ("/salary", "nav.salary"),
     ("/reliability", "nav.reliability"),
     ("/ask", "nav.ask"),
@@ -73,10 +75,15 @@ def shell(request: Request, active: str, **extra) -> dict:
         request.query_params.get("lang") or request.cookies.get("lang")
     )
     t = i18n.translator(lang)
+    # The masthead carries a real dateline: a publication states when its
+    # figures were pulled, and this one can, because every vintage is stamped.
+    stats = db.summary(conn)
     ctx = {
         "request": request,
         "project_name": PROJECT_NAME,
         "project_tagline": t("tagline"),
+        "edition_date": (stats["last_retrieved"] or "")[:10],
+        "edition_vintages": stats["vintages"],
         "nav": [(href, t(key)) for href, key in NAV],
         "active": active,
         "footer_note": t("footer.note"),
@@ -88,6 +95,14 @@ def shell(request: Request, active: str, **extra) -> dict:
     }
     ctx.update(extra)
     return ctx
+
+
+@app.exception_handler(404)
+def not_found(request: Request, exc: HTTPException):
+    """A wrong URL should still be a page, and still say which pages exist."""
+    response = render("404.html", shell(request, "", path=request.url.path))
+    response.status_code = 404
+    return response
 
 
 def render(name: str, ctx: dict) -> HTMLResponse:
@@ -249,10 +264,13 @@ def explorer(
         median if breakdown == "total" else {},
         base_year=base, preliminary=prelim,
     )
-    units = sorted({
-        r["unit"] for r in db.series(conn, WAGE_DATASET, WAGE_INDICATOR, breakdown)
-        if r["period"] in set(picked)
-    })
+    chosen = set(picked)
+    unit_of = {
+        r["period"]: r["unit"]
+        for r in db.series(conn, WAGE_DATASET, WAGE_INDICATOR, breakdown)
+        if r["period"] in chosen
+    }
+    units = sorted(set(unit_of.values()))
     mixed_era = len(units) > 1
 
     chart = charts.line_chart(
@@ -265,6 +283,7 @@ def explorer(
         },
         height=290, value_fmt="{:,.0f}",
     )
+    bands = charts.era_bands(chart, [r["period"] for r in series], unit_of)
     return render("explorer.html", shell(
         request, "/explorer",
         breakdown=breakdown, breakdown_choices=BREAKDOWN_CHOICES,
@@ -272,11 +291,96 @@ def explorer(
         include_pre_gel=include_pre_gel, base=base,
         base_choices=sorted(cpi),
         series=series, chart=chart, units=units, mixed_era=mixed_era,
+        era_bands=bands,
         gel_era_start=GEL_ERA_START,
         currency_name=currency_name,
         source_url=ADAPTERS[WAGE_DATASET].url,
         vintage_id=db.latest_vintage_id(conn, WAGE_DATASET),
         cpi_years=sorted(cpi),
+    ))
+
+
+# --------------------------------------------------------------------------
+# /regions
+# --------------------------------------------------------------------------
+
+@app.get("/regions", response_class=HTMLResponse)
+def regions(request: Request, year: str = Query("")):
+    """Regions ranked for one year, indexed against the national figure.
+
+    The national row is published in the same file under the `total`
+    breakdown, so the index divides two figures from one release rather than
+    mixing a regional release with a national one from a different vintage.
+    """
+    vintage_id = db.latest_vintage_id(conn, REGION_DATASET)
+    rows = db.series(conn, REGION_DATASET, WAGE_INDICATOR, "total")
+    years = sorted({r["period"] for r in rows if r["value"] is not None})
+    if year not in years:
+        year = years[-1] if years else ""
+
+    by_region = {}
+    for row in db.breakdowns(conn, REGION_DATASET, WAGE_INDICATOR):
+        code = row["breakdown_code"]
+        if code == "total":
+            continue
+        value = db.value_map(conn, REGION_DATASET, WAGE_INDICATOR, code).get(year)
+        if value is not None:
+            by_region[code] = {"label": row["breakdown_label"], "value": value}
+
+    national = db.value_map(conn, REGION_DATASET, WAGE_INDICATOR, "total").get(year)
+    ranked = sorted(by_region.values(), key=lambda r: r["value"], reverse=True)
+    for rank, row in enumerate(ranked, start=1):
+        row["rank"] = rank
+        row["index"] = (
+            metrics.region_index(row["value"], national) if national else None
+        )
+
+    # The spread over time: the leading and trailing region in every published
+    # year, each as an index of that year's national figure. Both endpoints move,
+    # so this is a spread, not one region's history.
+    national_by_year = db.value_map(conn, REGION_DATASET, WAGE_INDICATOR, "total")
+    codes = [
+        r["breakdown_code"]
+        for r in db.breakdowns(conn, REGION_DATASET, WAGE_INDICATOR)
+        if r["breakdown_code"] != "total"
+    ]
+    maps = {c: db.value_map(conn, REGION_DATASET, WAGE_INDICATOR, c) for c in codes}
+    spread = []
+    for y in years:
+        vals = {c: m[y] for c, m in maps.items() if m.get(y) is not None}
+        if not vals or not national_by_year.get(y):
+            continue
+        top_code = max(vals, key=vals.get)
+        low_code = min(vals, key=vals.get)
+        spread.append({
+            "period": y,
+            "top": metrics.region_index(vals[top_code], national_by_year[y]),
+            "low": metrics.region_index(vals[low_code], national_by_year[y]),
+            "top_label": by_region.get(top_code, {}).get("label", top_code),
+            "low_label": by_region.get(low_code, {}).get("label", low_code),
+        })
+
+    spread_chart = charts.line_chart(
+        [r["period"] for r in spread],
+        {
+            "Highest region": [r["top"] for r in spread],
+            "National": [100.0 for _ in spread],
+            "Lowest region": [r["low"] for r in spread],
+        },
+        height=240, value_fmt="{:,.0f}",
+    )
+    for line in spread_chart.lines:
+        if line.label == "National":
+            line.dashed = True
+
+    return render("regions.html", shell(
+        request, "/regions",
+        year=year, years=years, ranked=ranked, national=national,
+        spread=spread, spread_chart=spread_chart,
+        bars=charts.bar_rows([(r["label"], r["value"]) for r in ranked]),
+        adapter=ADAPTERS[REGION_DATASET],
+        vintage_id=vintage_id,
+        prelim=year in db.preliminary_periods(conn, REGION_DATASET),
     ))
 
 
@@ -324,8 +428,15 @@ def salary(
         {f"{amount:,.0f} GEL from {lo}, kept whole": [r["equivalent"] for r in ladder]},
         height=230, value_fmt="{:,.0f}",
     )
+    # One axis carrying the two published points and the entered amount. The
+    # amount is placed by value, not by rank: it can sit outside both.
+    scale = charts.position_scale([
+        ("Published median", median.get(median_year)),
+        ("Published mean", wage.get(compare_year)),
+        ("Your amount", amount),
+    ])
     return render("salary.html", shell(
-        request, "/salary",
+        request, "/salary", scale=scale,
         amount=amount, year_from=lo, year_to=hi, years=years,
         equivalent=equivalent, inflation=inflation, annualised=annualised,
         span=span, real_today=real_today, ladder=ladder, chart=chart,

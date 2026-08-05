@@ -5,6 +5,10 @@ National Statistics Office of Georgia: wages and prices, with every retrieval
 kept as an immutable vintage and every methodology caveat stated next to the
 number it applies to.
 
+![The series explorer with the currency-era band: the shaded span is not
+Lari, and the strip under the axis names Rouble, Coupon, Thousand Coupon and
+Lari](docs/screenshots/hero.png)
+
 ## What it does
 
 - **Ingests eight real Geostat workbooks** (annual and median earnings, earnings
@@ -18,6 +22,9 @@ number it applies to.
 - **Validates every vintage against nine data contracts** before the numbers
   reach a chart, including a currency-era check that catches the specific trap
   this dataset sets, and reports the offending rows when one fails.
+- **Ranks the eleven regions against the national figure** for any published
+  year, stating the head-office effect that inflates Tbilisi rather than
+  quietly correcting for it.
 - **Answers questions from a closed set of approved metric functions** and
   refuses the ones the published aggregates cannot support, with the reason.
 - **Proves the contracts work** by injecting faults into copies of committed
@@ -77,6 +84,84 @@ A five-minute tour:
 5. <http://127.0.0.1:8013/ask> — the grounded analyst. Skip past the answers to
    the refusals: *What is the 90th percentile salary in Georgia?* and *What is
    the average take-home pay after tax in 2024?* Those are the interesting ones.
+6. <http://127.0.0.1:8013/regions?year=2024> — the eleven regions indexed
+   against the country. Tbilisi at 119 is the head-office effect, and the page
+   says so above the chart rather than in a footnote nobody reads.
+
+## Screenshots
+
+The interface is deliberately a light one: a printed statistical yearbook rather
+than a dashboard. Serif display type, thin rules, numbered exhibits with a source
+line under each one, an editorial measure for prose, and footnotes set as
+footnotes. The masthead carries a real dateline, computed from the vintages on
+disk rather than typed in.
+
+![The overview: a ruled key-figures band, then the same published column set
+plotted naively and honestly side by side](docs/screenshots/overview.png)
+
+*`/` — the key figures, then Figure 1: why the naive line is meaningless.*
+
+![Regional earnings ranked for 2024, each region indexed against the national
+figure, with the head-office caveat stated above the
+chart](docs/screenshots/regions.png)
+
+*`/regions` — ranked, indexed, and honest about what the ranking measures.*
+
+![Dataset reliability: one card per dataset with retrieval time, checksum,
+byte size and contract pass rate. The headline rate is an honest 96 percent,
+not a tuned 100](docs/screenshots/reliability.png)
+
+*`/reliability` — eight datasets, ten vintages, 7,197 observations, and a 69/72
+contract pass rate that is left failing on purpose.*
+
+![The contract audit sheet: a pass/fail gutter down the left, the failing JOIN
+check naming 1995 to 1999 as undeflatable, and each check's reason set as a
+footnote](docs/screenshots/contract-sheet.png)
+
+*`/reliability/earnings_annual` — contract results as a printed audit sheet. The
+`JOIN` failure is real: the CPI series starts in 2000, so five Lari-era wage
+years genuinely cannot be deflated.*
+
+![The vintage log as an editorial corrections notice: current and superseded
+releases, each with its retrieval route, checksum and revision
+summary](docs/screenshots/vintage-diff.png)
+
+*`/reliability/earnings_by_region` — three genuine releases of one series. Two
+were recovered from the Internet Archive and are labelled as such; the third was
+fetched directly. The diff reports years added with nothing revised.*
+
+![The analyst refusing to answer a percentile question, with the reason and what
+data would be needed](docs/screenshots/ask-refusal.png)
+
+*`/ask` — a percentile cannot be reconstructed from a mean and a median, so the
+analyst refuses and says what it would need instead.*
+
+![The salary position scale: one axis from zero carrying the published median,
+the published mean and the entered amount](docs/screenshots/salary.png)
+
+*`/salary` — the entered amount against two published points. The caption says
+plainly that two points are not a distribution, so the position is not a
+percentile.*
+
+![The fault lab after injecting a currency-era mislabel: the contract results
+table with the tripped check, and a defect report ready to
+paste](docs/screenshots/lab.png)
+
+*`/lab` — inject a defect into a copy, watch the contract catch it, and read the
+checksum proving the committed vintage never moved.*
+
+![The methodology page as a numbered document with a contents
+list](docs/screenshots/methodology.png)
+
+*`/methodology` — six numbered sections, a contents list, and a Limitations
+section that is real.*
+
+![The regional ranking at a 375 pixel viewport: rank, region and index on one
+line, bar and figure on the next, with no horizontal page
+scroll](docs/screenshots/mobile-375.png)
+
+*375px. Every page holds `scrollWidth === clientWidth` at this width in both
+English and Georgian.*
 
 ## How it works
 
@@ -98,7 +183,7 @@ A five-minute tour:
                                          ▼
                              metrics.py (pure) · analyst.py (router)
                                          ▼
-                                  main.py → Jinja2 → 7 pages
+                        main.py → Jinja2 → 8 pages + charts.py (inline SVG)
 ```
 
 The vintages on disk are the source of truth. The sqlite database is a derived
@@ -106,7 +191,7 @@ read index that `python -m app.seed` rebuilds from scratch on every start; it is
 gitignored, and if it ever disagrees with a vintage the vintage wins.
 
 Business logic lives in importable modules — `adapters`, `ingest`, `contracts`,
-`metrics`, `analyst`, `faults` — and the route handlers only assemble template
+`metrics`, `analyst`, `faults`, `charts` — and the route handlers only assemble template
 context. That is what makes the test suite meaningful: it imports the same
 functions the pages call.
 
@@ -163,7 +248,7 @@ magnitude and the check would produce only noise there.
 ./.venv/bin/python -m pytest -q
 ```
 
-**174 tests, all passing.** They cover:
+**206 tests, all passing.** They cover:
 
 - parser behaviour against the committed workbook: the eight confirmed published
   values, `…` preserved as a gap rather than zeroed, the numeric-string cell for

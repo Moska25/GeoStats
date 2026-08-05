@@ -32,11 +32,22 @@ class Chart:
     x_ticks: list[tuple[float, str]]
     y_ticks: list[tuple[float, str]]
     empty: bool = False
+    # One x per plotted period, kept so era_bands can line a band strip up with
+    # the axis without re-deriving the geometry.
+    x_positions: list[float] = field(default_factory=list)
 
 
-PALETTE = ["var(--accent)", "#34d399", "#fbbf24", "#f87171", "#a78bfa"]
+# Series colours live in app.css so the theme owns them: the same hex cannot be
+# legible on a dark instrument panel and on cream paper.
+PALETTE = [
+    "var(--series-1)", "var(--series-2)", "var(--series-3)",
+    "var(--series-4)", "var(--series-5)",
+]
 
 PAD_L, PAD_R, PAD_T, PAD_B = 46, 12, 12, 26
+
+# Roughly the width of a four-digit year at the axis font size, plus air.
+MIN_TICK_GAP = 40.0
 
 
 def line_chart(
@@ -82,14 +93,91 @@ def line_chart(
     step = max(1, round(n / max_x_ticks))
     x_ticks = [(x_at(i), periods[i]) for i in range(0, n, step)]
     if x_ticks and x_ticks[-1][1] != periods[-1]:
-        x_ticks.append((x_at(n - 1), periods[-1]))
+        # The final period always gets a tick, but the stepped one before it may
+        # be too close: on the 1970-2025 series that printed "2020" and "2025"
+        # on top of each other. The last label wins, the crowded one goes.
+        last_x = x_at(n - 1)
+        if last_x - x_ticks[-1][0] < MIN_TICK_GAP:
+            x_ticks.pop()
+        x_ticks.append((last_x, periods[-1]))
 
     y_ticks = []
     for k in range(5):
         v = lo + (hi - lo) * k / 4
         y_ticks.append((y_at(v), value_fmt.format(v)))
 
-    return Chart(width, height, lines, x_ticks, y_ticks)
+    return Chart(width, height, lines, x_ticks, y_ticks,
+                 x_positions=[x_at(i) for i in range(n)])
+
+
+def era_bands(
+    chart: Chart,
+    periods: list[str],
+    unit_of: dict[str, str],
+    *,
+    current: str = "GEL",
+) -> list[dict]:
+    """Contiguous runs of one currency across the plotted periods.
+
+    The unit comes from the observations themselves, not from a re-derivation,
+    so the band names what each row is actually denominated in. Coordinates are
+    in the chart's own space: both SVGs scale to the same width, so the strip
+    stays aligned with the axis at any viewport.
+    """
+    if chart.empty or len(periods) != len(chart.x_positions) or not periods:
+        return []
+
+    runs: list[dict] = []
+    for i, period in enumerate(periods):
+        code = unit_of.get(period)
+        if code is None:
+            return []                      # an unlabelled row cannot be shaded
+        if runs and runs[-1]["code"] == code:
+            runs[-1]["last"] = i
+        else:
+            runs.append({"code": code, "first": i, "last": i})
+
+    xs = chart.x_positions
+    right = chart.width - PAD_R
+    bands = []
+    for run in runs:
+        i, j = run["first"], run["last"]
+        x0 = PAD_L if i == 0 else (xs[i - 1] + xs[i]) / 2
+        x1 = right if j == len(xs) - 1 else (xs[j] + xs[j + 1]) / 2
+        bands.append({
+            "code": run["code"],
+            "current": run["code"] == current,
+            "x": x0,
+            "width": max(x1 - x0, 0.0),
+            "y": PAD_T,
+            "height": chart.height - PAD_T - PAD_B,
+            "first": periods[i],
+            "last": periods[j],
+        })
+    return bands
+
+
+def position_scale(
+    points: list[tuple[str, float | None]], *, headroom: float = 0.08
+) -> dict:
+    """Marks on one shared 0-to-max axis, as percentages of the axis width.
+
+    Used to place a salary against the published mean and median. Deliberately
+    linear from zero: a scale that started at the smallest value would make the
+    gap between two figures look like whatever the renderer chose.
+    """
+    values = [v for _, v in points if v is not None]
+    if not values:
+        return {"max": 0.0, "marks": []}
+    top = max(values) * (1.0 + headroom)
+    return {
+        "max": top,
+        "marks": [
+            {"label": label, "value": value, "pct": round(value / top * 100, 2)}
+            for label, value in points
+            if value is not None
+        ],
+    }
 
 
 def bar_rows(

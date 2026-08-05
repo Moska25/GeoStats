@@ -151,3 +151,22 @@ def test_build_series_carries_the_preliminary_flag():
     )
     assert rows[0]["is_preliminary"] is False
     assert rows[1]["is_preliminary"] is True
+
+
+# -- regional index --------------------------------------------------------
+
+def test_region_index_is_100_when_the_region_matches_the_country():
+    assert metrics.region_index(1234.5, 1234.5) == pytest.approx(100.0)
+
+
+def test_region_index_against_a_hand_computed_value():
+    # 1,014.3 GEL against a national 1,918.6 GEL.
+    # 1014.3 / 1918.6 * 100 = 52.86667361...
+    assert metrics.region_index(1014.3, 1918.6) == pytest.approx(52.866674, abs=1e-6)
+
+
+def test_region_index_refuses_a_missing_or_zero_national_figure():
+    with pytest.raises(metrics.MetricError):
+        metrics.region_index(1000.0, None)
+    with pytest.raises(metrics.MetricError):
+        metrics.region_index(1000.0, 0.0)

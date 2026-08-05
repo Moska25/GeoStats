@@ -1,0 +1,124 @@
+{% extends "_layout.html" %}
+{% import "_macros.html" as m %}
+{% block title %}{{ t('page.regions') }}{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <h1>{{ t('page.regions') }}</h1>
+  <p class="lede">The eleven regions ranked for one year, each indexed against the
+    national figure published in the same release. Nothing here is modelled: the
+    index divides two numbers that arrived in one workbook.</p>
+</div>
+
+<form class="card" method="get" action="/regions" style="margin-top:14px">
+  {% if lang != 'en' %}<input type="hidden" name="lang" value="{{ lang }}">{% endif %}
+  <div class="toolbar">
+    <div class="field field-year">
+      <label for="year">{{ t('m.year') }}</label>
+      <select id="year" name="year">
+        {% for y in years %}<option value="{{ y }}" {{ 'selected' if y == year }}>{{ y }}</option>{% endfor %}
+      </select>
+    </div>
+    <button class="btn btn-primary" type="submit">Apply</button>
+    <span class="small faint">national {{ m.num(national) }} GEL{% if prelim %} ·
+      <span class="pill pill-warn">{{ t('q.preliminary') }}</span>{% endif %}</span>
+  </div>
+</form>
+
+<p class="note note-warn" style="margin-top:14px">
+  <strong>Read Tbilisi with care.</strong> {{ adapter.note }} A head office in
+  Tbilisi puts its whole payroll in Tbilisi, wherever the work happens, so this
+  is a map of where employers are registered as much as a map of what places
+  pay. Geostat publishes no correction for it and neither does this page.
+</p>
+
+{% if ranked %}
+<div class="section">
+{% call m.exhibit(1, 'Average monthly nominal earnings by region, ' ~ year,
+    source='Geostat, ' ~ adapter.title|lower ~ '. Vintage ' ~ vintage_id ~
+           '. Gross, before personal income tax.') %}
+  <div class="card">
+    <ol class="rank">
+      {% for r in ranked %}
+      <li class="{{ 'is-above' if r.index and r.index >= 100 else '' }}">
+        <span class="rank-no">{{ r.rank }}</span>
+        <span class="rank-label">{{ r.label }}</span>
+        <span class="rank-bar" aria-hidden="true">
+          <span style="width: {{ bars[loop.index0].pct }}%"></span>
+        </span>
+        <span class="rank-value">{{ m.num(r.value) }}</span>
+        <span class="rank-index">{{ '%.1f'|format(r.index) if r.index else 'n/a' }}</span>
+      </li>
+      {% endfor %}
+    </ol>
+    <p class="footnote">Bars are drawn to the highest region in the selected
+      year. The last column is the region as an index of the national figure,
+      where the country as a whole is 100.</p>
+  </div>
+{% endcall %}
+</div>
+
+{% if spread %}
+<section class="section">
+  <div class="section-head"><h2>The spread over time</h2>
+    <span class="tag">{{ spread[0].period }}&ndash;{{ spread[-1].period }}</span></div>
+  {% call m.exhibit(2, 'Highest and lowest region against the national figure, ' ~
+      spread[0].period ~ ' to ' ~ spread[-1].period,
+      source='Geostat, ' ~ adapter.title|lower ~ '. Each point is that year\'s ' ~
+             'region divided by that year\'s national figure, both from the same release.') %}
+  <div class="card">
+    {{ m.chart(spread_chart) }}
+    <p class="footnote">Both ends move: the highest region is
+      {{ spread[-1].top_label }} in {{ spread[-1].period }} and
+      {{ spread[0].top_label }} in {{ spread[0].period }}, so this is the spread
+      between the extremes in each year, not the history of one place. The
+      dashed line is the national figure at 100 by construction. No trend is
+      fitted and none is claimed.</p>
+  </div>
+  {% endcall %}
+</section>
+{% endif %}
+
+<section class="section">
+  <div class="section-head"><h2>The ranking as a table</h2>
+    <span class="tag">{{ ranked|length }} regions · national = 100</span></div>
+  <div class="card card-tight">
+    <div class="table-wrap">
+      <table class="data">
+          <caption class="visually-hidden">Regions ranked by average monthly nominal earnings, with each region indexed against the national figure</caption>
+        <thead>
+          <tr>
+            <th class="num">Rank</th>
+            <th>{{ t('m.region') }}</th>
+            <th class="num">GEL / month</th>
+            <th class="num">Index, national = 100</th>
+            <th class="num">Difference</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for r in ranked %}
+          <tr>
+            <td class="num">{{ r.rank }}</td>
+            <td class="wrap">{{ r.label }}</td>
+            <td class="num">{{ m.num(r.value) }}</td>
+            <td class="num">{{ '%.1f'|format(r.index) if r.index else 'n/a' }}</td>
+            <td class="num">{{ '{:+,.2f}'.format(r.value - national) if national else 'n/a' }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {{ m.provenance([
+      ('dataset', 'earnings_by_region'),
+      ('indicator', 'avg_monthly_nominal_earnings'),
+      ('period', year),
+      ('unit', 'GEL'),
+      ('vintage', vintage_id),
+      ('source', adapter.url),
+  ]) }}
+</section>
+{% else %}
+<div class="empty" style="margin-top:14px">No regional values published for {{ year }}.</div>
+{% endif %}
+{% endblock %}

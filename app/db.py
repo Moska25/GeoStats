@@ -202,7 +202,8 @@ def summary(conn: sqlite3.Connection) -> dict:
                   (SELECT COUNT(*) FROM vintages) AS vintages,
                   (SELECT COUNT(DISTINCT dataset_id) FROM vintages) AS datasets,
                   (SELECT COUNT(*) FROM contract_runs) AS checks,
-                  (SELECT COUNT(*) FROM contract_runs WHERE passed = 1) AS checks_passed"""
+                  (SELECT COUNT(*) FROM contract_runs WHERE passed = 1) AS checks_passed,
+                  (SELECT MAX(retrieved_at) FROM vintages) AS last_retrieved"""
     ).fetchone()
     return dict(row)
 

@@ -1,8 +1,303 @@
-/* GeoStats - project accent plus the few rules base.css does not cover. */
+/* GeoStats - "statistical publication".
+   A printed statistical yearbook: warm paper, ink, serif display, thin rules.
 
-:root { --accent: #3b82f6; }
+   The inversion is done entirely by overriding base.css variables here.
+   base.css is never forked and never edited: it is the shared skeleton, and
+   every one of the four apps must keep running off the same copy. The spacing
+   scale, the --r radii and the .container width are deliberately left alone. */
 
-/* language toggle in the top bar */
+:root {
+  /* paper and ink */
+  --bg:            #faf7f2;
+  --surface:       #fffdf9;
+  --surface-2:     #f1ece2;
+  --border:        #ddd6c9;
+  --border-strong: #9c8e78;   /* 3.0:1 on paper - control boundaries stay visible */
+  --text:          #16181d;
+  --text-muted:    #4d4842;
+  --text-faint:    #6a645c;
+
+  --accent:        #3b82f6;
+  --accent-dim:    color-mix(in srgb, var(--accent) 14%, transparent);
+  --accent-text:   #1d4ed8;   /* base.css lightens the accent for a dark page;
+                                 on paper the link has to go darker, not lighter */
+
+  /* semantic colours, re-derived for a light ground. Every one of these was
+     measured against its own 13% pill tint as well as against the card. */
+  --pass: #146c34;
+  --fail: #b42318;
+  --warn: #8a5300;
+  --info: #1d4ed8;
+  --idle: #6a645c;
+
+  /* chart ink. Dark-theme series colours (#34d399, #fbbf24) disappear on
+     cream, so the series get their own paper-legible ramp, all >= 3:1. */
+  --series-1: #1d4ed8;
+  --series-2: #0f766e;
+  --series-3: #a15c07;
+  --series-4: #b42318;
+  --series-5: #5b21b6;
+
+  --serif: ui-serif, Georgia, "Times New Roman", serif;
+}
+
+/* The dark theme's ambient accent wash reads as a stain on paper. */
+body::before { display: none; }
+
+body { background-color: var(--bg); }
+
+/* ---------- editorial type ---------- */
+
+h1, h2, h3, h4 { font-family: var(--serif); }
+h1 { font-size: 31px; font-weight: 400; letter-spacing: -0.012em; }
+h2 { font-size: 20px; font-weight: 600; letter-spacing: -0.006em; }
+h3 { font-size: 15px; font-weight: 600; letter-spacing: 0; }
+
+/* Georgian is not in any serif on this machine. Measured: the string
+   "მსყიდველობითი" is 166.42578125px wide at 20px in Georgia, Times New Roman,
+   ui-serif, serif AND in a deliberately missing family - identical to the
+   pixel, which means every serif here is falling back to the same system
+   substitute. Setting a Georgian heading in the serif stack would therefore
+   only style the Latin around it, so :lang(ka) headings take the system sans
+   that actually draws the script. Correct Georgian beats a prettier heading. */
+:lang(ka) h1, :lang(ka) h2, :lang(ka) h3, :lang(ka) h4,
+:lang(ka) .brand, :lang(ka) .lede { font-family: var(--sans); }
+
+.page-head {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 16px;
+}
+.page-head .lede {
+  font-family: var(--serif);
+  font-size: 15.5px;
+  line-height: 1.6;
+  max-width: 68ch;          /* an editorial measure, not the full 1240px */
+  color: var(--text-muted);
+}
+:lang(ka) .page-head .lede { font-size: 14.5px; }
+
+/* the topbar is sticky, so a linked section must not land underneath it */
+.section[id] { scroll-margin-top: 72px; }
+
+/* section titles sit on a rule, the way a printed section head does */
+.section-head {
+  border-bottom: 1px solid var(--text);
+  padding-bottom: 7px;
+  margin-bottom: 14px;
+}
+
+/* prose keeps a readable measure rather than running the full page width */
+.note, .card > p, .lede { max-width: 68ch; }
+
+/* ---------- masthead ---------- */
+
+.topbar { border-bottom: 1px solid var(--border-strong); }
+.brand { font-family: var(--serif); font-size: 17px; font-weight: 600; letter-spacing: 0; }
+.brand-sub {
+  font-family: var(--sans);
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+}
+.footer { border-top: 3px double var(--border-strong); }
+
+/* The dateline: a publication says when its figures were pulled. Every value
+   here is computed from the committed vintages, never typed in. */
+.dateline {
+  border-top: 1px solid var(--border);
+  border-bottom: 3px double var(--border-strong);
+  background: color-mix(in srgb, var(--surface-2) 55%, transparent);
+}
+.dateline-inner {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 5px 24px;
+  display: flex;
+  gap: 6px 20px;
+  flex-wrap: wrap;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: var(--text-faint);
+}
+.dateline-inner > span { min-width: 0; overflow-wrap: anywhere; }
+.dateline-source { margin-left: auto; }
+
+/* keyboard users get out of the nav without tabbing through it */
+.skip {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 30;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  padding: 9px 14px;
+  font-size: 13px;
+  font-weight: 550;
+}
+.skip:focus { left: 12px; top: 12px; }
+
+/* Reachable by a screen reader, never drawn. Not display:none, which would
+   take the caption out of the accessibility tree along with the pixels. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------- a numbered document: contents and section numbers ---------- */
+
+.contents {
+  border-top: 2px solid var(--text);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 0 16px;
+  margin-top: 22px;
+  max-width: 68ch;
+}
+.contents-head {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin: 0 0 8px;
+}
+.contents ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: toc;
+}
+.contents li { counter-increment: toc; padding: 3px 0; font-size: 13.5px; }
+.contents li::before {
+  content: counter(toc);
+  display: inline-block;
+  width: 1.6rem;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-faint);
+}
+.sec-no {
+  display: inline-block;
+  min-width: 1.5rem;
+  font-family: var(--mono);
+  font-size: 0.72em;
+  font-weight: 600;
+  color: var(--accent-text);
+  vertical-align: 0.12em;
+}
+
+.notfound-nav {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  font-size: 14px;
+}
+.notfound-nav > li { min-width: 0; }
+
+/* ---------- numbered exhibits ---------- */
+
+.fig { margin: 0; }
+.fig + .fig { margin-top: 22px; }
+.fig-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 9px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+.fig-no {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--accent-text);
+  white-space: nowrap;
+}
+.fig-title {
+  font-family: var(--serif);
+  font-size: 14.5px;
+  color: var(--text);
+  min-width: 0;
+}
+:lang(ka) .fig-title { font-family: var(--sans); font-size: 13.5px; }
+.fig-source {
+  margin: 9px 0 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-faint);
+  max-width: 68ch;
+  overflow-wrap: anywhere;
+}
+.fig-source b {
+  font-family: var(--sans);
+  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-right: 6px;
+}
+
+/* ---------- key figures: a ruled panel, not four boxes ----------
+   base.css gives .metric a card; on paper a statistical summary reads better
+   as columns divided by rules, so the box is unwound here rather than there. */
+
+.keyfigures {
+  border-top: 2px solid var(--text);
+  border-bottom: 1px solid var(--border);
+  gap: 0 30px;
+}
+.keyfigures .metric {
+  background: none;
+  border: 0;
+  border-radius: 0;
+  padding: 16px 0;
+}
+.keyfigures .metric-value {
+  font-variant-numeric: tabular-nums slashed-zero;
+  font-size: 27px;
+}
+.keyfigures .metric-label { color: var(--text-muted); }
+
+/* ---------- surfaces on paper ---------- */
+
+.card { background: var(--surface); }
+table.data thead th { border-bottom: 2px solid var(--text); background: var(--surface); }
+table.data tbody tr:hover { background: var(--surface-2); }
+
+/* base.css tints the primary button's hover with --accent-text, which is now
+   dark enough that the near-black label on it would fail. */
+.btn-primary:hover { background: var(--accent-text); border-color: var(--accent-text); color: #fff; }
+
+/* a footnote, set like one */
+.footnote {
+  border-top: 1px solid var(--border);
+  margin-top: 10px;
+  padding-top: 8px;
+  font-size: 12px;
+  color: var(--text-faint);
+  max-width: 68ch;
+}
+.footnote::before { content: "\2020"; margin-right: 7px; color: var(--text-muted); }
+
+/* ---------- language toggle in the top bar ---------- */
+
 .lang { display: flex; gap: 2px; margin-left: auto; flex: none; }
 .lang a {
   padding: 4px 9px;
@@ -14,7 +309,8 @@
 .lang a:hover { background: var(--surface-2); color: var(--text); text-decoration: none; }
 .lang a.active { background: var(--accent-dim); color: var(--accent-text); }
 
-/* inline SVG charts */
+/* ---------- inline SVG charts ---------- */
+
 .chart { width: 100%; height: auto; display: block; }
 .chart .grid-line { stroke: var(--border); stroke-width: 1; }
 .chart .axis-text { fill: var(--text-faint); font-size: 10px; font-family: var(--mono); }
@@ -23,13 +319,44 @@
 .chart-legend .key { display: inline-flex; align-items: center; gap: 6px; }
 .chart-legend .swatch { width: 14px; height: 3px; border-radius: 2px; }
 
-/* side-by-side comparison of the naive and the honest series */
+/* ---------- the currency-era band ----------
+   The one thing this project most wants a reader to understand: the columns
+   are four different currencies. The wash marks the spans inside the plot,
+   the strip below names them, and the key survives at 375px where a label
+   inside a one-year band never could. */
+
+.chart .era-wash { fill: var(--warn); opacity: 0.09; }
+.era-band { width: 100%; height: auto; display: block; margin-top: 2px; }
+.era-band .era { fill: var(--warn); opacity: 0.16; }
+.era-band .era.is-current { fill: var(--accent); opacity: 0.13; }
+.era-band .era-edge { stroke: var(--border-strong); stroke-width: 1; }
+.era-band .era-label {
+  fill: var(--text-muted);
+  font-size: 10px;
+  font-family: var(--mono);
+}
+.era-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.era-key > span { min-width: 0; }
+.era-key .era-years { font-family: var(--mono); color: var(--text-faint); }
+.era-key .era-code { font-family: var(--mono); font-weight: 600; color: var(--text); }
+.era-key .is-current .era-code { color: var(--accent-text); }
+
+/* ---------- side-by-side comparison of the naive and the honest series ---------- */
+
 .compare { display: grid; gap: 14px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .compare .bad { border-color: color-mix(in srgb, var(--fail) 40%, var(--border)); }
 .compare .good { border-color: color-mix(in srgb, var(--pass) 40%, var(--border)); }
 @media (max-width: 760px) { .compare { grid-template-columns: minmax(0, 1fr); } }
 
-/* provenance strip under every computed number */
+/* ---------- provenance strip under every computed number ---------- */
+
 .prov {
   display: flex;
   flex-wrap: wrap;
@@ -47,7 +374,8 @@
 .prov b { color: var(--text-muted); font-weight: 500; }
 .prov .val { color: var(--text); }
 
-/* formula callout */
+/* ---------- formula callout ---------- */
+
 .formula {
   font-family: var(--mono);
   font-size: 12.5px;
@@ -61,7 +389,8 @@
   word-break: break-word;
 }
 
-/* answer / refusal blocks */
+/* ---------- answer / refusal blocks ---------- */
+
 .answer { border-left: 2px solid var(--pass); }
 .refusal { border-left: 2px solid var(--warn); }
 .unmatched { border-left: 2px solid var(--idle); }
@@ -73,15 +402,285 @@
 .answer + .answer, .refusal + .refusal,
 .answer + .refusal, .refusal + .answer,
 .unmatched + .answer, .answer + .unmatched { margin-top: 12px; }
-.answer-head { font-size: 15px; color: var(--text); font-weight: 550; margin-bottom: 8px; }
+.answer-head { font-family: var(--serif); font-size: 16px; color: var(--text); font-weight: 600; margin-bottom: 8px; }
+:lang(ka) .answer-head { font-family: var(--sans); font-size: 15px; }
 
-/* key/value list */
+/* ---------- key/value list ---------- */
+
 .kv { display: grid; grid-template-columns: max-content 1fr; gap: 6px 18px; font-size: 13px; }
 .kv dt { color: var(--text-faint); }
 .kv dd { margin: 0; font-family: var(--mono); color: var(--text); overflow-wrap: anywhere; }
 @media (max-width: 560px) { .kv { grid-template-columns: minmax(0, 1fr); gap: 2px 0; } .kv dd { margin-bottom: 8px; } }
 
-/* fault list */
+/* base.css lets toolbar fields grow to share the row, which is right when there
+   are five of them and wrong when there is one: a lone year select stretched
+   the full page width. */
+.toolbar .field-year { flex: 0 1 210px; }
+
+/* ---------- position scale ----------
+   One linear axis from zero carrying the published median, the published mean
+   and the amount the reader typed. Deliberately not a distribution: the key
+   below names every mark, because a bare rail invites reading a percentile
+   into a gap that has none. */
+
+.scale { padding: 6px 0 0; }
+.scale-rail {
+  position: relative;
+  height: 26px;
+  background: linear-gradient(var(--surface-2), var(--surface-2)) center / 100% 8px no-repeat;
+  border-radius: 2px;
+}
+.scale-mark {
+  position: absolute;
+  top: 3px;
+  width: 2px;
+  height: 20px;
+  margin-left: -1px;
+  background: var(--text-muted);
+}
+.scale-mark.is-you {
+  width: 3px;
+  height: 26px;
+  top: 0;
+  margin-left: -1.5px;
+  background: var(--accent-text);
+}
+.scale-axis {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-faint);
+  margin-top: 4px;
+  border-top: 1px solid var(--border);
+  padding-top: 5px;
+}
+.scale-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 26px;
+  margin: 14px 0 0;
+}
+.scale-key > div { min-width: 0; }
+.scale-key dt {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.scale-key dd {
+  margin: 2px 0 0;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums slashed-zero;
+  font-size: 15px;
+  color: var(--text);
+}
+.scale-key .is-you dt { color: var(--accent-text); }
+.scale-key .is-you dd { color: var(--accent-text); font-weight: 600; }
+
+.chart-legend .swatch-dashed {
+  background: none !important;
+  height: 0;
+  border-top: 3px dashed var(--series-2);
+}
+
+/* ---------- regional ranking ----------
+   A ranked list, not a chart library: rank, name, bar, value, index, on one
+   ruled row each. The bar is proportional to the leading region in the year. */
+
+.rank { list-style: none; margin: 0; padding: 0; }
+.rank > li {
+  display: grid;
+  grid-template-columns: 2.2rem minmax(6rem, 1fr) minmax(60px, 2fr) 5.5rem 4rem;
+  align-items: center;
+  gap: 0 14px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+}
+.rank > li:last-child { border-bottom: 0; }
+.rank-no {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+.rank-label { min-width: 0; font-size: 13.5px; overflow-wrap: anywhere; }
+.rank-bar {
+  height: 9px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+  min-width: 0;
+}
+.rank-bar > span { display: block; height: 100%; background: var(--series-1); }
+.rank > li.is-above .rank-bar > span { background: var(--accent-text); }
+.rank-value, .rank-index {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums slashed-zero;
+  font-size: 13px;
+  text-align: right;
+  white-space: nowrap;
+}
+.rank-index { color: var(--text-muted); }
+.rank > li.is-above .rank-index { color: var(--accent-text); font-weight: 600; }
+
+@media (max-width: 640px) {
+  /* Two lines per region: rank, name and index above; bar and figure below.
+     Placed by name, because auto-placement dropped the value into the rank
+     column once the bar started spanning. */
+  .rank > li {
+    grid-template-columns: 1.9rem minmax(0, 1fr) 4.8rem;
+    grid-template-areas:
+      "no  label index"
+      "bar bar   value";
+    row-gap: 7px;
+    padding: 11px 0;
+  }
+  .rank-no { grid-area: no; }
+  .rank-label { grid-area: label; }
+  .rank-index { grid-area: index; }
+  .rank-bar { grid-area: bar; height: 7px; align-self: center; }
+  .rank-value { grid-area: value; }
+}
+
+/* ---------- the contract audit sheet ----------
+   Contract results as a printed audit sheet: one ruled row per check with a
+   pass/fail gutter down the left, not a wall of cards. Three of these fail on
+   purpose, so the failures have to be readable rather than hidden. */
+
+.audit {
+  border: 1px solid var(--border);
+  border-top: 2px solid var(--text);
+  border-radius: 0 0 var(--r) var(--r);
+  background: var(--surface);
+  overflow: hidden;
+}
+.audit-row {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  border-bottom: 1px solid var(--border);
+}
+.audit-row:last-child { border-bottom: 0; }
+.audit-gutter {
+  border-right: 1px solid var(--border);
+  background: var(--surface-2);
+  padding: 15px 8px;
+  text-align: center;
+  min-width: 0;
+}
+.audit-row.is-pass .audit-gutter { background: color-mix(in srgb, var(--pass) 9%, var(--surface)); }
+.audit-row.is-fail .audit-gutter { background: color-mix(in srgb, var(--fail) 11%, var(--surface)); }
+.audit-mark {
+  display: block;
+  font-family: var(--mono);
+  font-size: 17px;
+  line-height: 1.1;
+  color: var(--text-muted);
+}
+.audit-row.is-pass .audit-mark { color: var(--pass); }
+.audit-row.is-fail .audit-mark { color: var(--fail); }
+.audit-verdict {
+  display: block;
+  margin-top: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.audit-row.is-pass .audit-verdict { color: var(--pass); }
+.audit-row.is-fail .audit-verdict { color: var(--fail); }
+.audit-body { padding: 15px 18px; min-width: 0; }
+.audit-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+.audit-code { font-family: var(--mono); font-weight: 600; font-size: 13px; color: var(--text); }
+.audit-title { font-family: var(--serif); font-size: 14px; color: var(--text-muted); }
+:lang(ka) .audit-title { font-family: var(--sans); }
+.audit-msg { font-size: 13px; margin: 0; color: var(--text-muted); max-width: 68ch; }
+
+@media (max-width: 560px) {
+  .audit-row { grid-template-columns: 62px minmax(0, 1fr); }
+  .audit-gutter { padding: 12px 4px; }
+  .audit-mark { font-size: 15px; }
+  .audit-verdict { font-size: 9px; letter-spacing: 0.06em; }
+  .audit-body { padding: 13px 14px; }
+}
+
+/* ---------- the vintage timeline, set as a corrections notice ---------- */
+
+.vintages { list-style: none; margin: 0; padding: 0; }
+.vintages > li {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  gap: 0 22px;
+  padding: 18px 0;
+  border-top: 1px solid var(--border);
+}
+.vintages > li:first-child { border-top: 2px solid var(--text); }
+.v-when { font-family: var(--mono); font-size: 12px; color: var(--text-muted); }
+.v-seq {
+  display: block;
+  font-family: var(--serif);
+  font-size: 12px;
+  font-style: italic;
+  color: var(--text-faint);
+  margin-bottom: 3px;
+}
+.v-id { font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--text); overflow-wrap: anywhere; }
+.v-facts { display: flex; flex-wrap: wrap; gap: 6px 10px; margin-top: 7px; }
+.v-checksum {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--text-faint);
+  overflow-wrap: anywhere;
+  margin-top: 7px;
+}
+.v-checksum b { color: var(--text-muted); font-weight: 500; }
+
+/* The retrieval route is the honesty control on this page: two of these
+   releases were recovered from the Internet Archive and must never read as
+   though they came straight off geostat.ge. */
+.route {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 550;
+  padding: 2px 9px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  white-space: normal;
+}
+.route::before { content: "\2192"; font-family: var(--mono); }
+.route-archive {
+  border-color: color-mix(in srgb, var(--warn) 45%, transparent);
+  background: color-mix(in srgb, var(--warn) 11%, transparent);
+  color: var(--warn);
+}
+.route-archive::before { content: "\21BA"; }
+.v-revision {
+  border-left: 2px solid var(--border-strong);
+  padding: 12px 0 2px 16px;
+  margin-top: 12px;
+}
+.v-revision > h4 {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-family: var(--sans);
+  color: var(--text-faint);
+  margin-bottom: 8px;
+}
+
+@media (max-width: 640px) {
+  .vintages > li { grid-template-columns: minmax(0, 1fr); gap: 8px 0; }
+}
+
+/* ---------- fault list ---------- */
+
 .fault-list { display: grid; gap: 10px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 @media (max-width: 900px) { .fault-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 640px) { .fault-list { grid-template-columns: minmax(0, 1fr); } }
@@ -98,6 +697,8 @@
 .fault .fault-name { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
 .fault .fault-why { font-size: 12px; color: var(--text-muted); }
 
+/* ---------- misc ---------- */
+
 /* long labels in tables must not force a horizontal page scroll */
 td.wrap { white-space: normal; min-width: 160px; }
 
@@ -110,4 +711,41 @@ td.wrap { white-space: normal; min-width: 160px; }
   border-radius: 4px;
   padding: 1px 6px;
   white-space: nowrap;
+}
+
+/* ---------- print ----------
+   An interface that argues it is a printed publication should survive being
+   printed. Chrome is the target; the point is a readable handout, not a
+   pixel-perfect facsimile. */
+
+@media print {
+  .topbar, .dateline, .lang, .skip, .btn, form, .fault-list { display: none; }
+  body { background: #fff; font-size: 11pt; }
+  .container { max-width: none; padding: 0; }
+  .card, .audit, .fig, .metric { break-inside: avoid; }
+  table.data { break-inside: auto; font-size: 9.5pt; }
+  table.data thead { display: table-header-group; }
+  table.data tr { break-inside: avoid; }
+  .table-wrap { overflow-x: visible; }
+  .chart { max-width: 100%; }
+  /* a printed source line has to carry the URL, since the link cannot be clicked */
+  .fig-source a::after, .kv a::after { content: " (" attr(href) ")"; font-size: 8pt; }
+  .footer { border-top: 1px solid #000; }
+}
+
+@media (max-width: 640px) {
+  /* .brand is nowrap in base.css, so it cannot shrink: the tracked uppercase
+     tagline made the masthead 411px wide (425px in Georgian) and took the whole
+     page past a 375px viewport. Every page carries its own h1 and lede, so the
+     masthead subtitle is the thing that goes. */
+  .brand-sub { display: none; }
+  .dateline-inner { padding: 5px 14px; font-size: 10.5px; gap: 4px 14px; }
+  .dateline-source { margin-left: 0; }
+
+  /* The band scales with the chart, so at 375px an in-band label would be
+     under 5px tall. The key below it carries the names instead. */
+  .era-band .era-label { display: none; }
+  h1 { font-size: 24px; }
+  h2 { font-size: 18px; }
+  .page-head .lede { font-size: 14.5px; }
 }

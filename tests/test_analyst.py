@@ -167,3 +167,34 @@ def test_approved_metric_list_is_not_empty_and_names_real_functions():
     for name, formula in APPROVED_METRICS:
         assert formula
         assert hasattr(metrics, name.split(".", 1)[1])
+
+
+# -- a named region answers about that region ------------------------------
+
+def test_a_named_region_leads_with_that_region_not_the_ranking(conn):
+    answer = ask(conn, "What did Imereti earn in 2024?")
+    assert answer.kind == "answer"
+    assert answer.headline.startswith("Imereti")
+    assert "64.3% of the national average" in answer.explanation
+    assert "rank 6 of 11 regions" in answer.explanation
+    # the full ranking survives as the table
+    assert any(row["label"] == "Tbilisi" for row in answer.table)
+
+
+def test_an_unnamed_regional_question_still_leads_with_top_and_bottom(conn):
+    answer = ask(conn, "Which region pays most?")
+    assert answer.kind == "answer"
+    assert "highest regional average was Tbilisi" in answer.headline
+
+
+def test_a_named_region_still_carries_the_head_office_caveat(conn):
+    answer = ask(conn, "How much do people earn in Guria?")
+    assert "head office" in answer.caveat
+    assert answer.provenance
+    assert answer.provenance[0]["dataset_id"] == "earnings_by_region"
+
+
+def test_median_by_region_is_still_refused(conn):
+    answer = ask(conn, "What is the median salary by region?")
+    assert answer.kind == "refusal"
+    assert answer.provenance == []

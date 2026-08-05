@@ -170,6 +170,20 @@ def mean_median_gap(mean: float, median: float) -> MeanMedianGap:
     )
 
 
+def region_index(region_value: float, national_value: float) -> float:
+    """A region's earnings as an index of the national figure, national = 100.
+
+        index = region / national * 100
+
+    Stated as an index rather than a difference because the underlying series
+    is nominal: the gap in Lari between Tbilisi and Guria grows every year on
+    inflation alone, while the index answers the question actually being asked.
+    """
+    region_value = _require(region_value, "regional earnings")
+    national_value = _require(national_value, "national earnings")
+    return region_value / national_value * 100.0
+
+
 # --------------------------------------------------------------------------
 # series assembly (still pure: dicts in, list of dicts out)
 # --------------------------------------------------------------------------

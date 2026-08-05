@@ -1,0 +1,23 @@
+{% extends "_layout.html" %}
+{% block title %}Page not found{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <h1>Page not found</h1>
+  <p class="lede">There is no page at <code>{{ path }}</code>. Nothing was
+    deleted and no dataset moved; this address has never existed in this
+    application.</p>
+</div>
+
+<div class="card" style="margin-top:14px">
+  <h2 style="margin-bottom:10px">Everything that does exist</h2>
+  <ul class="notfound-nav">
+    {% for href, label in nav %}
+    <li><a href="{{ href }}{{ '?lang=' ~ lang if lang != 'en' else '' }}">{{ label }}</a></li>
+    {% endfor %}
+  </ul>
+  <p class="footnote">A dataset page lives at
+    <code>/reliability/&lt;dataset_id&gt;</code>; the ids are listed on
+    <a href="/reliability{{ '?lang=' ~ lang if lang != 'en' else '' }}">{{ t('page.reliability')|lower }}</a>.</p>
+</div>
+{% endblock %}

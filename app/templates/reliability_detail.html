@@ -18,70 +18,86 @@
   </form>
 </p>
 
-<section class="section">
+<section class="section" id="contract-sheet">
   <div class="section-head"><h2>Contract results, latest vintage</h2>
     <span class="tag">{{ latest }}</span></div>
+  {% if checks %}
+  <div class="audit">
   {% for c in checks %}
-  <div class="card" style="margin-bottom:10px">
-    <div class="row" style="margin-bottom:8px">
-      {{ m.pill(c.passed) }}
-      <strong>{{ c.code }}</strong>
-      <span class="muted">{{ c.title }}</span>
-      <span class="spacer"></span>
-      <span class="tag">{{ '{:,}'.format(c.checked) }} checked</span>
+    <div class="audit-row {{ 'is-pass' if c.passed else 'is-fail' }}">
+      <div class="audit-gutter">
+        <span class="audit-mark" aria-hidden="true">{{ '✓' if c.passed else '✕' }}</span>
+        <span class="audit-verdict">{{ 'pass' if c.passed else 'fail' }}</span>
+      </div>
+      <div class="audit-body">
+        <div class="audit-head">
+          <span class="audit-code">{{ c.code }}</span>
+          <span class="audit-title">{{ c.title }}</span>
+          <span class="spacer"></span>
+          <span class="tag">{{ '{:,}'.format(c.checked) }} checked</span>
+        </div>
+        <p class="audit-msg">{{ c.message }}</p>
+        {% if c.offender_rows %}
+        <div class="table-wrap" style="margin-top:12px">
+          <table class="data">
+          <caption class="visually-hidden">Rows that failed this contract</caption>
+            <thead><tr><th>Breakdown</th><th>{{ t('m.period') }}</th><th>{{ t('m.unit') }}</th>
+              <th class="num">{{ t('m.value') }}</th><th>Problem</th></tr></thead>
+            <tbody>
+            {% for o in c.offender_rows[:12] %}
+              <tr>
+                <td class="mono">{{ o.get('breakdown_code', '-') }}</td>
+                <td class="mono">{{ o.get('period', '-') }}</td>
+                <td class="mono">{{ o.get('unit', '-') }}</td>
+                <td class="num">{{ m.num(o.get('value')) }}</td>
+                <td class="wrap">{{ o.get('_problem', '') }}</td>
+              </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% if c.offender_rows|length > 12 %}
+        <p class="small faint" style="margin:8px 0 0">{{ c.offender_rows|length - 12 }} more not shown.</p>
+        {% endif %}
+        {% endif %}
+        <p class="footnote">Why: {{ c.why }}</p>
+      </div>
     </div>
-    <p class="small" style="margin-bottom:8px">{{ c.message }}</p>
-    <p class="small faint" style="margin-bottom:0">Why: {{ c.why }}</p>
-    {% if c.offender_rows %}
-    <div class="table-wrap" style="margin-top:12px">
-      <table class="data">
-        <thead><tr><th>Breakdown</th><th>{{ t('m.period') }}</th><th>{{ t('m.unit') }}</th>
-          <th class="num">{{ t('m.value') }}</th><th>Problem</th></tr></thead>
-        <tbody>
-        {% for o in c.offender_rows[:12] %}
-          <tr>
-            <td class="mono">{{ o.get('breakdown_code', '-') }}</td>
-            <td class="mono">{{ o.get('period', '-') }}</td>
-            <td class="mono">{{ o.get('unit', '-') }}</td>
-            <td class="num">{{ m.num(o.get('value')) }}</td>
-            <td class="wrap">{{ o.get('_problem', '') }}</td>
-          </tr>
-        {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    {% if c.offender_rows|length > 12 %}
-    <p class="small faint" style="margin:8px 0 0">{{ c.offender_rows|length - 12 }} more not shown.</p>
-    {% endif %}
-    {% endif %}
+  {% endfor %}
   </div>
   {% else %}
   <div class="empty">No contract results recorded for this dataset.</div>
-  {% endfor %}
+  {% endif %}
 </section>
 
-<section class="section">
+<section class="section" id="vintage-log">
   <div class="section-head"><h2>Vintage log</h2>
     <span class="tag">newest first · nothing here is ever overwritten</span></div>
-  <ul class="timeline">
+  <ol class="vintages">
   {% for v in history %}
-    <li class="{{ 'ok' if loop.first else '' }}">
-      <div class="t-when">{{ v.retrieved_at }}</div>
-      <div class="t-what">
-        <strong>{{ v.vintage_id }}</strong>
-        <span class="tag">{{ '{:,}'.format(v.row_count) }} rows</span>
-        <span class="tag">{{ '{:,}'.format(v.byte_size) }} bytes</span>
-        <span class="tag">HTTP {{ v.http_status }}</span>
+    <li>
+      <div>
+        <span class="v-seq">{{ 'Current release' if loop.first else 'Superseded release' }}</span>
+        <div class="v-when">{{ v.retrieved_at }}</div>
+        <div style="margin-top:8px">
+          <span class="route {{ 'route-archive' if 'Archive' in v.retrieval_via else 'route-direct' }}">{{ v.retrieval_via }}</span>
+        </div>
       </div>
-      <div class="small faint mono" style="word-break:break-all">sha256 {{ v.sha256 }}</div>
-      <div class="small faint">via {{ v.retrieval_via }}</div>
-      {% if v.release_note %}<div class="small muted">{{ v.release_note }}</div>{% endif %}
+      <div>
+        <div class="v-id">{{ v.vintage_id }}</div>
+        <div class="v-facts">
+          <span class="tag">{{ '{:,}'.format(v.row_count) }} rows</span>
+          <span class="tag">{{ '{:,}'.format(v.byte_size) }} bytes</span>
+          <span class="tag">HTTP {{ v.http_status }}</span>
+        </div>
+        <div class="v-checksum"><b>sha256</b> {{ v.sha256 }}</div>
+      {% if v.release_note %}<p class="footnote">{{ v.release_note }}</p>{% endif %}
       {% if v.diff %}
-        <div class="card" style="margin-top:10px">
-          <div class="row" style="margin-bottom:8px">
+        <div class="v-revision">
+          <h4>Revisions against {{ v.diff.old_vintage }}</h4>
+          <div class="row" style="margin-bottom:10px">
             <span class="pill {{ 'pill-idle' if v.diff.bytes_identical else 'pill-info' }}">
               {{ 'bytes identical' if v.diff.bytes_identical else 'bytes differ' }}</span>
-            <span class="tag">vs {{ v.diff.old_vintage }}</span>
           </div>
           <dl class="kv">
             <dt>Values revised</dt><dd>{{ v.diff.changed|length }}</dd>
@@ -92,6 +108,7 @@
           {% if v.diff.changed %}
           <div class="table-wrap" style="margin-top:12px">
             <table class="data">
+          <caption class="visually-hidden">Values revised between this vintage and the previous one</caption>
               <thead><tr><th>Series</th><th>{{ t('m.period') }}</th>
                 <th class="num">Was</th><th class="num">Now</th><th class="num">Delta</th></tr></thead>
               <tbody>
@@ -123,13 +140,14 @@
           {% endif %}
         </div>
       {% else %}
-        <div class="small faint" style="margin-top:6px">Earliest retrieval on record; nothing to diff against.</div>
+        <p class="footnote">Earliest retrieval on record; nothing to diff against.</p>
       {% endif %}
+      </div>
     </li>
   {% else %}
     <li><div class="empty">No vintages.</div></li>
   {% endfor %}
-  </ul>
+  </ol>
 </section>
 
 <section class="section">

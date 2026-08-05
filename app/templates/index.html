@@ -10,7 +10,7 @@
     number on this page is computed from a workbook committed in this repository.</p>
 </div>
 
-<div class="grid grid-4">
+<div class="grid grid-4 keyfigures">
   <div class="metric">
     <div class="metric-label">{{ t('m.mean') }} · {{ latest_year }}</div>
     <div class="metric-value">{{ m.num(latest_wage) }}</div>
@@ -49,7 +49,7 @@
 <section class="section">
   <div class="section-head">
     <h2>The trap: four currencies in one row of columns</h2>
-    <span class="pill pill-fail pill-plain">the reason this project exists</span>
+    <span class="pill pill-accent pill-plain">the reason this project exists</span>
   </div>
   <p class="muted" style="max-width:76ch">
     The annual earnings workbook carries a footnote:
@@ -60,6 +60,8 @@
     year, the <code>CURRENCY_ERA</code> contract fails any series that mixes eras
     under one label, and the explorer defaults to the Lari era.
   </p>
+  {% call m.exhibit(1, 'The same published column set, plotted two ways',
+      source='Geostat, average monthly nominal earnings, annual. Vintage ' ~ vintage_id ~ '.') %}
   <div class="compare">
     <div class="card bad">
       <h3 style="margin-bottom:8px">Naive: every published column as one line</h3>
@@ -76,34 +78,43 @@
       </p>
     </div>
   </div>
+  {% endcall %}
 
-  <div class="card card-tight" style="margin-top:14px">
-    <div class="card-head"><h3>The handover years, as published</h3>
-      <span class="tag">earnings_annual · breakdown total</span></div>
-    <div class="table-wrap">
-      <table class="data">
-        <thead><tr><th>{{ t('m.year') }}</th><th class="num">{{ t('m.value') }}</th>
-          <th>{{ t('m.unit') }}</th><th>Currency</th></tr></thead>
-        <tbody>
-        {% for r in era_rows %}
-          <tr>
-            <td class="mono">{{ r.period }}</td>
-            <td class="num">{{ m.num(r.value) }}</td>
-            <td><span class="tag">{{ r.unit }}</span></td>
-            <td>{{ currency_name(r.unit) }}</td>
-          </tr>
-        {% else %}
-          <tr><td colspan="4"><div class="empty">No handover years in this vintage.</div></td></tr>
-        {% endfor %}
-        </tbody>
-      </table>
+  <div style="margin-top:22px">
+  {% call m.exhibit(1, 'The handover years, as published', kind='Table',
+      source='Geostat, average monthly nominal earnings, annual, breakdown total. ' ~
+             'The unit column is the currency in force that year, per the workbook footnote.') %}
+    <div class="card card-tight">
+      <div class="table-wrap">
+        <table class="data">
+          <caption class="visually-hidden">Average monthly nominal earnings for the currency handover years, with the currency in force</caption>
+          <thead><tr><th>{{ t('m.year') }}</th><th class="num">{{ t('m.value') }}</th>
+            <th>{{ t('m.unit') }}</th><th>Currency</th></tr></thead>
+          <tbody>
+          {% for r in era_rows %}
+            <tr>
+              <td class="mono">{{ r.period }}</td>
+              <td class="num">{{ m.num(r.value) }}</td>
+              <td><span class="tag">{{ r.unit }}</span></td>
+              <td>{{ currency_name(r.unit) }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="4"><div class="empty">No handover years in this vintage.</div></td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
+  {% endcall %}
   </div>
 </section>
 
 <section class="section">
   <div class="section-head"><h2>Nominal against real, {{ base_year }} = 100</h2>
     <a class="btn btn-sm" href="/explorer{{ '?lang=' ~ lang if lang != 'en' else '' }}">Open the explorer</a></div>
+  {% call m.exhibit(2, 'Nominal and CPI-deflated earnings, ' ~ base_year ~ ' = 100',
+      source='Geostat, average monthly nominal earnings, annual; consumer price index, ' ~
+             '2010 average = 100. Real index computed here from the two series.') %}
   <div class="card">
     {{ m.chart(real_chart) }}
     <p class="note" style="margin:14px 0 0">
@@ -116,6 +127,7 @@
       nominal earnings go back to {{ wage_first }}.
     </p>
   </div>
+  {% endcall %}
 </section>
 
 <section class="section">

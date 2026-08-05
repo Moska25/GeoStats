@@ -445,18 +445,47 @@ def _intent_region(conn, q: str, years: list[str]) -> Answer | None:
     national = db.value_map(conn, REGION_DATASET, WAGE_INDICATOR, "total",
                             vintage_id=vintage_id).get(year)
     top, bottom = ranked[0], ranked[-1]
-    return Answer(
-        kind="answer", question=q, intent="region_ranking",
-        headline=(
+
+    # If the question names one region, answer about that region. Leading with
+    # Tbilisi and Racha-Lechkhumi when someone asked about Imereti is a ranking
+    # dressed up as an answer.
+    named = next(
+        (
+            (label, value)
+            for label, value in ranked
+            if re.search(r"\b" + re.escape(label.split()[0].lower()) + r"\b", q)
+        ),
+        None,
+    )
+    if named:
+        label, value = named
+        index = metrics.region_index(value, national) if national else None
+        headline = f"{label} averaged {_fmt(value)} GEL a month in {year}."
+        explanation = (
+            f"That is {index:.1f}% of the national average of "
+            f"{_fmt(national)} GEL, and rank "
+            f"{[r[0] for r in ranked].index(label) + 1} of {len(ranked)} regions."
+            if index is not None
+            else f"Rank {[r[0] for r in ranked].index(label) + 1} of {len(ranked)} regions."
+        )
+        formula = "region / national * 100, both from the same release"
+    else:
+        headline = (
             f"In {year} the highest regional average was {top[0]} at "
             f"{_fmt(top[1])} GEL; the lowest was {bottom[0]} at {_fmt(bottom[1])} GEL."
-        ),
-        formula="direct lookup of the published regional means, ranked descending",
-        explanation=(
+        )
+        explanation = (
             f"The national average that year was {_fmt(national)} GEL. "
             f"{top[0]} is {top[1] / bottom[1]:.2f}x {bottom[0]}."
             if national else f"{top[0]} is {top[1] / bottom[1]:.2f}x {bottom[0]}."
-        ),
+        )
+        formula = "direct lookup of the published regional means, ranked descending"
+
+    return Answer(
+        kind="answer", question=q, intent="region_ranking",
+        headline=headline,
+        formula=formula,
+        explanation=explanation,
         caveat=(
             "Enterprises are counted at the location of their head office, "
             "which shifts pay toward Tbilisi relative to where the work is "
@@ -686,6 +715,7 @@ EXAMPLES = [
     "How much inflation was there between 2020 and 2024?",
     "What is the gender pay gap in 2024?",
     "Which region had the highest average pay in 2024?",
+    "What did Imereti earn in 2024?",
     "What is the 90th percentile salary in Georgia?",
     "What does a software engineer earn in Imereti?",
     "What is the average take-home pay after tax in 2024?",

@@ -61,8 +61,32 @@
 </p>
 {% endif %}
 
-<div class="card" style="margin-top:14px">
-  {{ m.chart(chart) }}
+<div style="margin-top:14px">
+{% call m.exhibit(1, 'Earnings ' ~ year_from ~ ' to ' ~ year_to ~ ', ' ~
+    (breakdown_choices | selectattr(0, 'equalto', breakdown) | map(attribute=1) | first | lower) ~
+    ', with the currency in force beneath',
+    source='Geostat, average monthly nominal earnings, annual. Vintage ' ~ vintage_id ~
+           '. Real series deflated by the CPI annual average, ' ~ base ~ ' prices.') %}
+<div class="card">
+  {{ m.chart(chart, show_legend=false, bands=era_bands) }}
+  {{ m.era_band(era_bands, chart.width, currency_name) }}
+  {{ m.legend(chart) }}
+  <p class="note {{ 'note-warn' if era_bands|length > 1 }}" style="margin:14px 0 0">
+    <strong>The band is the currency actually in force.</strong>
+    {% if era_bands|length > 1 %}
+      This selection crosses {{ era_bands|length }} of them, and the shaded spans
+      above are shaded because they are <em>not</em> Lari. A line drawn across
+      that boundary is drawing Roubles, Coupons and Lari as though they were one
+      quantity; the {{ gel_era_start }} step is a redenomination, not a wage
+      collapse. Nothing here converts between eras, because Geostat publishes no
+      conversion series and inventing one would be fabrication.
+    {% else %}
+      Every year plotted is denominated in {{ currency_name(era_bands[0].code) if era_bands else 'one currency' }},
+      so the line is a comparable series. Add the pre-{{ gel_era_start }} columns
+      above and the band splits into the four currencies the workbook actually
+      holds.
+    {% endif %}
+  </p>
   <p class="note" style="margin:14px 0 0">
     <strong>Real is nominal with prices removed.</strong> Real GEL =
     nominal × (CPI<sub>{{ base }}</sub> / CPI<sub>t</sub>), so the real line is
@@ -71,6 +95,8 @@
     chart hides the gap, a blank cell shows it.
   </p>
 </div>
+{% endcall %}
+</div>
 
 <section class="section">
   <div class="section-head"><h2>Series table</h2>
@@ -78,6 +104,7 @@
   <div class="card card-tight">
     <div class="table-wrap">
       <table class="data">
+          <caption class="visually-hidden">Nominal, real, median, index and year-on-year values for each year in the selected range</caption>
         <thead>
           <tr>
             <th>{{ t('m.year') }}</th>

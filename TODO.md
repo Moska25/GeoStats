@@ -2,20 +2,22 @@
 
 ## Status
 
-Phases 1–7 are built and working. The application ingests eight real Geostat
+Phases 1–7, 10 and 13–16 are built and working. The application ingests eight real Geostat
 workbooks into immutable vintages under `data/vintages/`, validates each vintage
-against nine data contracts, and serves seven pages on port 8013 entirely
+against nine data contracts, and serves eight pages on port 8013 entirely
 offline from committed data. `earnings_by_region` carries three genuine
 published releases (2020-10-13, 2022-01-29, and the current file) so the vintage
 diff runs against real revisions history; the other seven datasets have one
 vintage each. Nine fault injections each trip their target contract on a copy of
 a vintage, and every run re-verifies that the committed original's sha256 is
-unchanged. The grounded analyst routes fourteen worked examples to a definite
+unchanged. The grounded analyst routes fifteen worked examples to a definite
 answer or a specific refusal with no language model involved. **The test suite is
-174 tests and is green** (`./.venv/bin/python -m pytest -q`). Three contract
+206 tests and is green** (`./.venv/bin/python -m pytest -q`). Three contract
 checks fail on purpose and are surfaced as failures in the UI: `JOIN` cannot
 match wage years 1995–1999 to a CPI annual average because the CPI series starts
-in 2000.
+in 2000. The interface is a light "statistical publication" theme, produced
+entirely by overriding `base.css` variables in `app/static/app.css`; the shared
+`base.css` is a verbatim copy and must stay one.
 
 ## How to pick up a task
 
@@ -195,16 +197,49 @@ in 2000.
       Done when: switching to quarterly redraws the chart from quarterly rows and
       the annual/quarterly choice is preserved in the query string.
 
-## Phase 10 — Regional atlas
+## Phase 10 — Regional atlas (done)
 
-- [ ] **GEO-10.1** Add a `/regions` page ranking regions with a bar chart per year.
+- [x] **GEO-10.1** Add a `/regions` page ranking regions with a bar chart per year.
       Files: `app/main.py`, `app/templates/regions.html`, `app/charts.py`
       Done when: the page renders `charts.bar_rows` output for a selected year
       from `earnings_by_region` and states the head-office caveat in a `.note`.
-- [ ] **GEO-10.2** Add a region-relative-to-national index.
+      Eleven regions, 2010 to 2024, ranked descending with the national figure
+      excluded from the ranking and used as the index base. The head-office
+      caveat is a `.note-warn` above the exhibit, not a footnote.
+- [x] **GEO-10.2** Add a region-relative-to-national index.
       Files: `app/metrics.py`, `tests/test_metrics.py`
       Done when: `region_index(region_value, national_value)` returns 100 when
       they are equal and is unit-tested against a hand-computed value.
+      Both figures come from the same release, so the index never mixes a
+      regional vintage with a national one from a different retrieval.
+
+## Phase 15 — Publication apparatus (done)
+
+A second design pass over Phase 13, taking the paper theme from "light" to
+"typeset". Restyle plus one chart-rendering fix; no figure changed.
+
+- [x] **GEO-15.1** Add a masthead dateline computed from the vintages on disk.
+      Files: `app/db.py` (`summary` now returns `last_retrieved`), `app/main.py`,
+      `app/templates/_layout.html`, `app/static/app.css`
+- [x] **GEO-15.2** Number the statistical exhibits and give each one a source line.
+      Files: `app/templates/_macros.html` (`exhibit`), `index.html`, `explorer.html`,
+      `regions.html`
+      Done when: every chart and every statistical table carries "Figure N" or
+      "Table N", a title, and a source naming the dataset and vintage.
+- [x] **GEO-15.3** Unwind the key-figures cards into a ruled band on `/`.
+      Files: `app/templates/index.html`, `app/static/app.css`
+- [x] **GEO-15.4** Add a skip link and a print stylesheet.
+      Done when: keyboard focus reaches a visible "Skip to content" control, and
+      printing drops the chrome, keeps table headers across pages and prints the
+      source URLs.
+- [x] **GEO-15.5** Stop the x axis printing two year labels on top of each other.
+      Files: `app/charts.py`, `tests/test_web.py`
+      Done when: on the 1970-2025 series the final period is still labelled and
+      the smallest gap between axis labels is at least 40px.
+- [x] **GEO-15.6** Stop using the failure red decoratively.
+      Files: `app/templates/index.html`
+      Done when: `pill-fail` appears only where a contract or a check actually
+      failed, so red keeps meaning one thing.
 
 ## Phase 11 — Release-calendar monitoring
 
@@ -231,6 +266,175 @@ in 2000.
       between the two sources by more than 0.01, and its message names the
       periods that disagree.
 
+## Phase 13 — Visual identity: "statistical publication" (done)
+
+Design spec: `MOSKA_MAIN/shared/UI_DIRECTION.md`, GeoStats section. Restyle only:
+ingestion, contracts, metrics and the analyst are untouched and no figure changes.
+This is the highest-risk restyle in the portfolio because it inverts the theme.
+
+- [x] **GEO-13.1** Invert to the light paper theme by overriding the CSS variables in
+      `app/static/app.css` only — never fork `base.css`.
+      Done when: every page passes AA contrast, nothing still assumes a dark background,
+      and both `?lang=en` and `?lang=ka` render correctly.
+      Landed: paper `#faf7f2` / ink `#16181d`, with `--accent-text`, `--pass`, `--fail`,
+      `--warn` and `--info` re-derived for a light ground and each measured against its
+      own pill tint. A computed-style audit over 16 page/language combinations reports
+      zero AA failures. `base.css` is untouched; `--r`, `--r-sm` and `--maxw` are left
+      exactly as the shared skeleton sets them.
+- [x] **GEO-13.2** Add the serif display scale with a verified Georgian fallback.
+      Files: `app/static/app.css`
+      Done when: a Georgian heading on `/explorer?lang=ka` renders in a font that actually
+      supports the script; if the serif stack does not, `:lang(ka)` headings fall back to
+      system sans.
+      Measured, do not undo: "მსყიდველობითი" is 166.42578125px wide at 20px in Georgia,
+      Times New Roman, ui-serif, serif AND in a deliberately missing family — identical to
+      the pixel, so no serif here supplies Georgian and every one of them substitutes.
+      `:lang(ka)` headings therefore take the system sans.
+- [x] **GEO-13.3** Add the currency-era band beneath the explorer chart.
+      Files: `app/charts.py`, `app/templates/explorer.html`, `app/static/app.css`
+      Done when: including pre-1995 columns visibly shades the affected span and names
+      Rouble, Coupon, Thousand Coupon and GEL.
+      `charts.era_bands` groups the plotted periods into contiguous runs of one currency
+      using the unit recorded on each observation, not a re-derivation.
+- [x] **GEO-13.4** Restyle the vintage list as an editorial timeline showing retrieval route,
+      checksum and diff.
+      Files: `app/templates/reliability_detail.html`, `app/static/app.css`
+      Done when: the Internet Archive route stays clearly distinguished from direct fetches.
+- [x] **GEO-13.5** Restyle contract results as a printed audit sheet with a pass/fail gutter
+      and the existing "Why:" note set as a footnote.
+      Files: `app/templates/reliability_detail.html`, `app/static/app.css`
+- [x] **GEO-13.6** Re-verify 375px on every page in both languages after the inversion.
+      Done when: `scrollWidth === clientWidth` on all 16 route/language combinations.
+      Verified on all 16, plus 16 heavier states (explorer with pre-1995 columns, both lab
+      fault reports, a refusal on `/ask`, the salary ladder at its maximum amount, two more
+      dataset detail pages, the refresh banner). One regression was found and fixed on the
+      way: the tracked uppercase masthead subtitle made `.brand` — which is `nowrap` in
+      `base.css` — 411px wide, so `.brand-sub` is hidden below 640px.
+
+## Phase 14 — Showcase assets (done)
+
+- [x] **GEO-14.1** Capture screenshots into `docs/screenshots/`: hero (explorer with era band),
+      reliability card, vintage diff, the analyst refusing a question, plus one at 375px.
+      Done when: five captioned PNGs exist, taken after Phase 13 lands.
+      Six shipped: `hero.png`, `reliability.png`, `contract-sheet.png`, `vintage-diff.png`,
+      `ask-refusal.png`, `mobile-375.png`. Note for whoever recaptures them: headless
+      Chrome clamps its viewport to a 500px minimum, so `--window-size=375` silently
+      renders at 500px and crops. The 375px shot was taken through a 375px-wide iframe in
+      a 500px window and centre-cropped.
+- [x] **GEO-14.2** Link the hero image at the top of README.md.
+
+## Phase 16 — Showcase completion (done)
+
+Phases 13 and 15 typeset the overview, explorer, regions and reliability pages.
+Three pages never got the same attention (`/salary`, `/methodology`, `/lab`), the
+tables are not announced to screen readers, and an unknown URL still returns raw
+JSON. This phase closes those gaps. Restyle plus two new computed exhibits; no
+existing figure changes.
+
+- [x] **GEO-16.1** Replace the salary comparison list with a position scale.
+      Files: `app/main.py` (`salary`), `app/templates/salary.html`, `app/static/app.css`
+      Done when: `/salary?amount=1500` renders one horizontal scale carrying three
+      marked points (published median, published mean, the entered amount), the
+      entered amount is positioned by value rather than by rank, and a caption
+      states that two published points are not a distribution and the space
+      between them is not a percentile.
+      `charts.position_scale` is the pure function behind it, unit-tested in
+      `tests/test_charts.py` including the case where the entered amount is
+      larger than both published figures.
+- [x] **GEO-16.2** Add the Tbilisi-premium-over-time exhibit to `/regions`.
+      Files: `app/main.py` (`regions`), `app/templates/regions.html`
+      Done when: a second chart plots each published year's index for the highest
+      and lowest region against the national 100 line, every point comes from
+      `metrics.region_index` over committed data, and the caption names the first
+      and last year of the span rather than asserting a trend.
+- [x] **GEO-16.3** Set `/methodology` as a numbered document with a contents list.
+      Files: `app/templates/methodology.html`, `app/static/app.css`
+      Done when: each section carries a stable `id` and a section number, a
+      contents list at the top links to all of them, and `pill-fail` no longer
+      appears on that page for anything that is not a failure.
+- [x] **GEO-16.4** Announce every statistical table to screen readers.
+      Files: the templates carrying `table.data`, `app/static/app.css`
+      Done when: every `table.data` has a `<caption>`, the caption is visually
+      hidden where an exhibit head already prints the same words, and the hiding
+      class keeps the text reachable (clip, not `display: none`).
+- [x] **GEO-16.5** Serve a styled 404 instead of raw JSON.
+      Files: `app/main.py`, `app/templates/404.html`
+      Done when: `/not-a-page` returns HTTP 404 with the site shell, an `h1`, a
+      `.lede`, and links to the pages that do exist, in both languages.
+- [x] **GEO-16.6** Give `/lab` the exhibit apparatus.
+      Files: `app/templates/lab.html`
+      Done when: the contract-results table is a numbered exhibit with a source
+      line naming the injected fault and the vintage it was copied from, and the
+      defect report block says in the UI that it is generated text meant to be
+      pasted into a ticket.
+- [x] **GEO-16.7** Capture the remaining showcase screenshots.
+      Files: `docs/screenshots/`, `README.md`
+      Done when: `salary.png`, `lab.png` and `methodology.png` exist, taken after
+      16.1 to 16.6 land, and each is captioned in the README.
+- [x] **GEO-16.8** Re-verify the whole surface after Phase 16.
+      Done when: `pytest` is green with the count recorded here, every route and
+      the 404 return the expected status in both languages, `scrollWidth ===
+      clientWidth` at 375px on all of them, and the computed-style contrast audit
+      reports zero AA failures.
+      How to reproduce the layout and contrast checks, because doing it against
+      a live server is flaky here: render every page variant through
+      `TestClient`, inline `base.css` and `app.css` into each response in place
+      of the two `<link>` tags, embed them all in one local HTML file, and walk
+      them in a single reused iframe with `document.write`. No server and no
+      network means headless Chrome has nothing to wait for and `--dump-dom`
+      returns a complete result. Measure `scrollWidth`/`clientWidth` at 375px
+      and composite every text node's colour against its real background for AA.
+      206 tests green. 28 route/language/state combinations hold
+      `scrollWidth === clientWidth` at 375px, and the contrast audit reports
+      zero AA failures across 56 renders (each combination at 375px and 1280px).
+
+## Phase 17 — Next, in priority order (not started)
+
+Everything above this line runs from data already committed. Everything below
+needs a **new vintage fetched from Geostat**, so each task starts by finding the
+workbook URL and ends by committing a real vintage. Geostat is reachable and
+answers a browser User-Agent; without one it returns HTTP 200 with a zero-byte
+body, which `Adapter.download` already guards against. Never fabricate a vintage
+to unblock a task: if the file cannot be found, mark the task blocked and say so.
+
+**Do these in order.** 17.1 is the cheapest real win, 17.5 is the largest.
+
+- [x] **GEO-17.1** Answer a named region with that region's figure, not the whole ranking.
+      Files: `app/analyst.py`, `tests/test_analyst.py`
+      `_intent_region` already routes regional questions and returns the full
+      ranking. The gap was narrower: *What did Imereti earn in 2024?* led with
+      Tbilisi and Racha-Lechkhumi because the headline is always top-and-bottom.
+      Done when: a question naming a region leads with that region's figure and
+      its index against the national average, the ranking stays as the table, an
+      unnamed regional question still leads with top and bottom, and the refusal
+      for *median by region* still fires because the median series carries no
+      regional breakdown. No new data needed; `earnings_by_region` is committed.
+- [ ] **GEO-17.2** Add a `?format=csv` download to the explorer and the regions page.
+      Files: `app/main.py`, `tests/test_web.py`
+      Done when: the response is `text/csv` with a `Content-Disposition` filename
+      carrying the dataset and vintage id, the header row names the unit, and the
+      rows equal the ones rendered in the HTML table for the same query string.
+      A statistics platform that cannot export is a screenshot.
+- [ ] **GEO-17.3** Add the labour-force adapter (supersedes GEO-8.1).
+      Files: `app/adapters.py`, `data/vintages/labour_force/`, `tests/test_adapters.py`
+      Done when: the employment, unemployment and activity-rate series parse into
+      long format from a committed vintage, `test_every_adapter_parses_its_committed_vintage`
+      covers `labour_force`, and the ILO age-15+ definition is recorded in the
+      adapter `note` so the UI can print it.
+- [ ] **GEO-17.4** Add the rate-bounds contract for percentage indicators (supersedes GEO-8.2).
+      Files: `app/contracts.py`, `tests/test_contracts.py`
+      Done when: `RANGE_BY_UNIT` gains `rate_pct` bounded 0 to 100, the `RANGE`
+      contract fails on an unemployment rate of 150 with the offending row named,
+      and a matching fault exists in `app/faults.py` so the lab still has one
+      injection per contract.
+- [ ] **GEO-17.5** Extend the period model to quarters (supersedes GEO-9.1).
+      Files: `app/adapters.py`, `app/contracts.py`, `tests/test_contracts.py`
+      Done when: `parse_period_header` produces `2024-Q3`, `COVERAGE` detects a
+      missing quarter in a quarterly series, and annual and quarterly rows of the
+      same indicator coexist without colliding on the composite key. Do this
+      before GEO-9.2: the quarterly adapter is unwritable until the period model
+      accepts quarters.
+
 ## Deliberately out of scope
 
 - **Forecasting or nowcasting wages.** A forecast has no vintage, no checksum and
@@ -250,7 +454,7 @@ in 2000.
 - **Converting pre-1995 Roubles or Coupons to Lari.** No official conversion
   series exists in these files, and inventing one would be fabrication.
 
-## Demo script (5 minutes)
+## Demo script (6 minutes)
 
 1. `./run.sh`, then open <http://127.0.0.1:8013/>. Point at the four metric
    cards: the 2025 mean is flagged preliminary, and the mean sits 48% above the
@@ -270,8 +474,12 @@ in 2000.
    to show `PARSE` catching a `fillna(0)`.
 5. Open <http://127.0.0.1:8013/ask>. Run *What is 1000 GEL from 2015 worth in
    2024?* and point at the provenance strip. Then scroll to *What is the 90th
-   percentile salary in Georgia?* and read the refusal. Close on: this is a
-   regex router over nine functions, and refusing is the feature.
+   percentile salary in Georgia?* and read the refusal. Say: this is a regex
+   router over nine functions, and refusing is the feature.
+6. Close on <http://127.0.0.1:8013/regions?year=2024>. Tbilisi at 119 against a
+   national 100, and the caveat above the chart saying the ranking places
+   enterprises at the head office. Scroll to Figure 2: both ends of the spread
+   move, so the page reports a spread and fits no trend.
 
 ## Resume bullets
 
@@ -287,6 +495,10 @@ in 2000.
   over nine unit-tested metric functions that attaches dataset, vintage, unit and
   formula to every answer and refuses questions the published aggregates cannot
   support. *(GEO-3.1 … GEO-3.3, GEO-4.1 … GEO-4.3)*
+- Built a regional earnings atlas that ranks eleven regions against the national
+  figure from the same release, indexes each one, and states the head-office
+  effect that inflates the capital instead of silently correcting for it.
+  *(GEO-10.1, GEO-10.2)*
 - **NOT YET EARNED** — "Monitors the official release calendar and flags overdue
   publications." Requires GEO-11.1 and GEO-11.2.
 - **NOT YET EARNED** — "Cross-validates spreadsheet releases against the PX-Web

@@ -10,8 +10,20 @@
     number from this application.</p>
 </div>
 
-<section class="section">
-  <div class="section-head"><h2>What the earnings figures actually measure</h2></div>
+<nav class="contents" aria-label="Contents">
+  <p class="contents-head">Contents</p>
+  <ol>
+    <li><a href="#measure">What the earnings figures actually measure</a></li>
+    <li><a href="#currency">The currency-era warning</a></li>
+    <li><a href="#formulas">Formulas</a></li>
+    <li><a href="#contracts">Data contracts</a></li>
+    <li><a href="#sources">Source catalogue</a></li>
+    <li><a href="#limitations">Limitations</a></li>
+  </ol>
+</nav>
+
+<section class="section" id="measure">
+  <div class="section-head"><h2><span class="sec-no">1</span>What the earnings figures actually measure</h2></div>
   <div class="card">
     <p><strong>Gross, before personal income tax.</strong> Nothing in GeoStats is
     take-home pay. Converting to net would need each year's income-tax and
@@ -34,10 +46,10 @@
   </div>
 </section>
 
-<section class="section">
+<section class="section" id="currency">
   <div class="section-head">
-    <h2>The currency-era warning</h2>
-    <span class="pill pill-fail pill-plain">read this one</span>
+    <h2><span class="sec-no">2</span>The currency-era warning</h2>
+    <span class="pill pill-accent pill-plain">read this one</span>
   </div>
   <div class="card">
     <p>The annual earnings workbook carries this footnote under the title:</p>
@@ -69,6 +81,7 @@
       <span class="tag">{{ era_rows|length }} periods, from the committed vintage</span></div>
     <div class="table-wrap">
       <table class="data">
+          <caption class="visually-hidden">Every published period with the currency in force that year</caption>
         <thead><tr><th>{{ t('m.year') }}</th><th class="num">{{ t('m.value') }}</th>
           <th>{{ t('m.unit') }}</th><th>Currency</th></tr></thead>
         <tbody>
@@ -78,7 +91,7 @@
             <td class="num">{{ m.num(r.value) }}</td>
             <td><span class="tag">{{ r.unit }}</span></td>
             <td>{% if r.unit == 'GEL' %}<span class="pill pill-pass">{{ currency_name(r.unit) }}</span>
-                {% else %}<span class="pill pill-fail">{{ currency_name(r.unit) }}</span>{% endif %}</td>
+                {% else %}<span class="pill pill-warn">{{ currency_name(r.unit) }}</span>{% endif %}</td>
           </tr>
         {% else %}
           <tr><td colspan="4"><div class="empty">No periods in this vintage.</div></td></tr>
@@ -89,12 +102,13 @@
   </div>
 </section>
 
-<section class="section">
-  <div class="section-head"><h2>Formulas</h2>
+<section class="section" id="formulas">
+  <div class="section-head"><h2><span class="sec-no">3</span>Formulas</h2>
     <span class="tag">app/metrics.py, unit-tested</span></div>
   <div class="card card-tight">
     <div class="table-wrap">
       <table class="data">
+          <caption class="visually-hidden">The approved metric functions and their formulas</caption>
         <thead><tr><th>Function</th><th>Formula</th></tr></thead>
         <tbody>
         {% for name, formula in approved %}
@@ -118,12 +132,13 @@
   </p>
 </section>
 
-<section class="section">
-  <div class="section-head"><h2>Data contracts</h2>
+<section class="section" id="contracts">
+  <div class="section-head"><h2><span class="sec-no">4</span>Data contracts</h2>
     <span class="tag">{{ contracts|length }} checks</span></div>
   <div class="card card-tight">
     <div class="table-wrap">
       <table class="data">
+          <caption class="visually-hidden">The data contract suite and the reason each check exists</caption>
         <thead><tr><th>Code</th><th>Check</th><th>Why it exists</th></tr></thead>
         <tbody>
         {% for c in contracts %}
@@ -136,8 +151,8 @@
   </div>
 </section>
 
-<section class="section">
-  <div class="section-head"><h2>Source catalogue</h2>
+<section class="section" id="sources">
+  <div class="section-head"><h2><span class="sec-no">5</span>Source catalogue</h2>
     <span class="tag">{{ adapters|length }} datasets · {{ summary.vintages }} vintages · {{ '{:,}'.format(summary.observations) }} observations</span></div>
   {% for a in adapters %}
   <div class="card" style="margin-bottom:10px">
@@ -153,8 +168,8 @@
   {% endfor %}
 </section>
 
-<section class="section">
-  <div class="section-head"><h2>Limitations</h2></div>
+<section class="section" id="limitations">
+  <div class="section-head"><h2><span class="sec-no">6</span>Limitations</h2></div>
   <div class="card">
     <ul class="muted" style="padding-left:20px;margin:0">
       <li>Earnings before 1995 are in Rouble, Coupon or Thousand Coupon and are
