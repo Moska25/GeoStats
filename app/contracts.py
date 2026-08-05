@@ -32,6 +32,18 @@ RANGE_BY_UNIT = {
     "index_2010_100":      (1.0, 1000.0),
     "index_prev_year_100": (1.0, 1000.0),
     "share_of_1":          (0.0, 1.0001),
+    # Georgia's 15+ population is ~3.2 million, so a head count in thousands
+    # cannot plausibly reach five figures.
+    "thousand_persons":    (0.0, 10_000.0),
+    "percent":             (0.0, 100.0),
+    "persons":             (0.0, 10_000_000.0),
+    "enterprises":         (0.0, 10_000_000.0),
+    "thousand_visits":     (0.0, 100_000.0),
+    # Household survey figures are per household per month. The upper bound is
+    # deliberately far above any published Georgian figure; it exists to catch
+    # an annual total pasted into a monthly column, not to judge the survey.
+    "GEL_per_household_month": (0.0, 100_000.0),
+    "count":               (0.0, 100_000_000.0),
 }
 
 # Ratio between consecutive periods of the same series and unit that we treat
@@ -44,6 +56,34 @@ JUMP_FACTOR = 10.0
 # ponytail: excluded by unit, not by dataset - revisit if a new share-valued
 # dataset arrives that does need the check.
 TEMPORAL_SANITY_SKIP_UNITS = {"share_of_1"}
+
+# Residual categories exist to absorb whatever the survey could not classify.
+# The LFS "not identified worker" line falls from 87 thousand in 2001 to 67
+# people in 2007 and back up again; that is the bucket doing its job across two
+# questionnaire redesigns, not a unit shift. Every other breakdown in these
+# datasets stays under the check.
+# ponytail: matched on the code, so a new dataset with its own residual line is
+# covered without another entry here. Matched against the indicator as well as
+# the breakdown, because the regional workbooks put the measure on the rows and
+# the place on the columns - the residual lands on the other axis there.
+TEMPORAL_SANITY_SKIP_FRAGMENT = "not_identified"
+
+# A 10x step only implies a unit error if the values are big enough for 10x to
+# be surprising. Property income of 0.46 GEL a month per household, one
+# registered enterprise in Abkhazia, or a 0.25% adjusted pay gap can all move
+# by an order of magnitude for entirely ordinary reasons, and flagging them
+# produces noise that buries the real finding. Below these floors the check
+# abstains rather than guesses. Monetary units carry no floor on purpose: the
+# currency-era trap is exactly a large step in a large series, and that must
+# always bite.
+TEMPORAL_MATERIAL_FLOOR_BY_UNIT = {
+    "thousand_persons": 1.0,            # a thousand people
+    "GEL_per_household_month": 10.0,    # ten lari a month
+    "enterprises": 10.0,
+    "persons": 10.0,
+    "percent": 1.0,                     # one percentage point
+    "thousand_visits": 1.0,
+}
 
 
 @dataclass
@@ -86,6 +126,22 @@ def _bad(c: Contract, message: str, offenders: list[dict], checked: int) -> Chec
 
 def _annual(period: str) -> bool:
     return len(period) == 4 and period.isdigit()
+
+
+def _quarterly(period: str) -> bool:
+    return bool(re.fullmatch(r"\d{4}-Q[1-4]", period))
+
+
+def _quarter_range(start: str, end: str) -> set[str]:
+    """Every quarter from `start` to `end` inclusive, as `YYYY-QN`."""
+    out: set[str] = set()
+    year, quarter = int(start[:4]), int(start[-1])
+    while f"{year}-Q{quarter}" <= end:
+        out.add(f"{year}-Q{quarter}")
+        quarter += 1
+        if quarter == 5:
+            year, quarter = year + 1, 1
+    return out
 
 
 def _year(period: str) -> int:
@@ -167,7 +223,22 @@ def _coverage(c: Contract, ctx: dict) -> CheckResult:
     checked = 0
     for (indicator, breakdown), periods in by_series.items():
         annual = all(_annual(p) for p in periods)
-        if annual:
+        quarterly = all(_quarterly(p) for p in periods)
+        if quarterly:
+            quarters = sorted(periods)
+            if len(quarters) < 2:
+                continue
+            checked += 1
+            gaps = sorted(_quarter_range(quarters[0], quarters[-1]) - set(quarters))
+            if gaps:
+                offenders.append({
+                    "indicator_code": indicator, "breakdown_code": breakdown,
+                    "_problem": (
+                        f"missing quarters {gaps[:8]} ({len(gaps)} total) "
+                        f"between {quarters[0]} and {quarters[-1]}"
+                    ),
+                })
+        elif annual:
             # Geostat publishes 1970/1975/1980/1985 then annually from 1986.
             # Only the Lari era has to be gapless; earlier sampling is by design.
             years = sorted(_year(p) for p in periods if _year(p) >= GEL_ERA_START)
@@ -310,14 +381,27 @@ def _temporal_sanity(c: Contract, ctx: dict) -> CheckResult:
     for r in rows:
         if r.get("value") is None or r["unit"] in TEMPORAL_SANITY_SKIP_UNITS:
             continue
+        if TEMPORAL_SANITY_SKIP_FRAGMENT in r["breakdown_code"]:
+            continue
+        if TEMPORAL_SANITY_SKIP_FRAGMENT in r["indicator_code"]:
+            continue
         by_series[(r["indicator_code"], r["breakdown_code"], r["unit"])].append(r)
 
     offenders = []
     checked = 0
     for key, series in by_series.items():
         series.sort(key=lambda r: r["period"])
+        floor = TEMPORAL_MATERIAL_FLOOR_BY_UNIT.get(key[2], 0.0)
         for prev, cur in zip(series, series[1:]):
-            if prev["value"] in (0, None) or cur["value"] is None:
+            # A step to or from exactly zero is never a unit shift: unit errors
+            # are multiplicative and no conversion factor produces zero. A
+            # published zero means the thing did not happen that year - no
+            # household in the sample sold property, no enterprise in Abkhazia
+            # closed - and dividing by it or reporting it as a 1000x move says
+            # nothing about data quality.
+            if prev["value"] in (0, None) or cur["value"] in (0, None):
+                continue
+            if max(abs(prev["value"]), abs(cur["value"])) < floor:
                 continue
             checked += 1
             ratio = cur["value"] / prev["value"]
@@ -329,7 +413,7 @@ def _temporal_sanity(c: Contract, ctx: dict) -> CheckResult:
                     "_problem": (
                         f"{prev['period']}={prev['value']:.4g} -> "
                         f"{cur['period']}={cur['value']:.4g} is a {ratio:.4g}x step "
-                        "inside one currency era"
+                        f"inside one unit ({key[2]})"
                     ),
                 })
     if offenders:
@@ -446,6 +530,195 @@ def _parse_integrity(c: Contract, ctx: dict) -> CheckResult:
 # 9. cross-dataset period alignment (wage / CPI join)
 # --------------------------------------------------------------------------
 
+@dataclass(frozen=True)
+class Identity:
+    """A relationship the source itself declares between its own measures.
+
+    Geostat prints these in the row labels: `1. Income, total (2+3)` says that
+    row 1 is rows 2 and 3 added together, and the labour force sheet publishes
+    both the unemployment count and the rate it implies. Checking them is how
+    a parser that read the right numbers into the wrong rows gets caught: every
+    individual value would sit inside its plausible range, and only the
+    arithmetic between them would break.
+    """
+
+    dataset_id: str
+    target: str
+    parts: tuple[str, ...]
+    kind: str = "sum"            # sum | ratio_percent
+    note: str = ""
+
+    def expected(self, values: dict[str, float]) -> float | None:
+        if self.kind == "sum":
+            return sum(values[p] for p in self.parts)
+        numerator, denominator = (values[p] for p in self.parts)
+        if not denominator:
+            return None
+        return 100.0 * numerator / denominator
+
+    def describe(self) -> str:
+        if self.kind == "sum":
+            return f"{self.target} = {' + '.join(self.parts)}"
+        return f"{self.target} = 100 x {self.parts[0]} / {self.parts[1]}"
+
+
+IDENTITIES: list[Identity] = [
+    Identity("labour_force", "labour_force", ("employed", "unemployed"),
+             note="the labour force is by definition everyone working or "
+                  "looking for work"),
+    Identity("labour_force", "unemployment_rate_percentage",
+             ("unemployed", "labour_force"), kind="ratio_percent",
+             note="the published rate must be the published counts' own ratio"),
+    Identity("labour_force_by_region", "labour_force",
+             ("employed", "unemployed")),
+    Identity("labour_force_by_region", "unemployment_rate_percentage",
+             ("unemployed", "labour_force"), kind="ratio_percent"),
+    Identity("household_income", "income_total",
+             ("cash_income_and_transfers", "non_cash_income"),
+             note="the sheet states this identity in its own row label, '1. "
+                  "Income, total (2+3)'"),
+    Identity("household_expenditure", "consumption_expenditure_total",
+             ("cash_consumption_expenditure", "non_cash_expenditure")),
+    Identity("business_demography", "enterprise_birth_rate",
+             ("enterprise_births", "active_enterprises"), kind="ratio_percent"),
+    Identity("business_demography", "enterprise_death_rate",
+             ("enterprise_deaths", "active_enterprises"), kind="ratio_percent"),
+]
+
+# Published figures are rounded, so an identity is allowed to miss by a hair.
+# The committed vintages hold to floating-point precision, so anything this
+# check reports is a real break rather than a rounding artefact.
+# Half the last digit PX-Web publishes. Derived from the API's rounding, not
+# chosen to make the check pass: the largest observed disagreement across 2,029
+# shared cells is exactly 0.05, which is what pure rounding produces.
+SOURCE_AGREEMENT_TOLERANCE = 0.05
+
+IDENTITY_ABS_TOLERANCE = 0.01
+IDENTITY_REL_TOLERANCE = 0.005
+
+
+def _identity(c: Contract, ctx: dict) -> CheckResult:
+    dataset_id = ctx.get("dataset_id") or ""
+    applicable = [i for i in IDENTITIES if i.dataset_id == dataset_id]
+    if not applicable:
+        return _ok(c, "no published identity is declared for this dataset", 0)
+
+    by_cell: dict[tuple, dict[str, float]] = defaultdict(dict)
+    for r in ctx["rows"]:
+        if r.get("value") is None:
+            continue
+        by_cell[(r["breakdown_code"], r["period"])][r["indicator_code"]] = r["value"]
+
+    offenders = []
+    checked = 0
+    for identity in applicable:
+        needed = {identity.target, *identity.parts}
+        for (breakdown, period), values in by_cell.items():
+            if not needed <= values.keys():
+                continue
+            expected = identity.expected(values)
+            if expected is None:
+                continue
+            checked += 1
+            actual = values[identity.target]
+            slack = max(IDENTITY_ABS_TOLERANCE,
+                        abs(expected) * IDENTITY_REL_TOLERANCE)
+            if abs(actual - expected) > slack:
+                offenders.append({
+                    "indicator_code": identity.target,
+                    "breakdown_code": breakdown, "period": period,
+                    "value": actual,
+                    "_problem": (
+                        f"{identity.describe()} gives {expected:.4f} but the "
+                        f"file publishes {actual:.4f} "
+                        f"(off by {actual - expected:+.4f})"
+                    ),
+                })
+    if offenders:
+        return _bad(
+            c,
+            f"{len(offenders)} published values disagree with the identity the "
+            "source itself states between its own measures. Every value can be "
+            "individually plausible and the arithmetic between them still wrong.",
+            offenders, checked,
+        )
+    return _ok(
+        c,
+        f"{checked} cells satisfy the {len(applicable)} "
+        f"{'identity' if len(applicable) == 1 else 'identities'} this dataset "
+        f"declares ({'; '.join(i.describe() for i in applicable)})",
+        checked,
+    )
+
+
+def _source_agreement(c: Contract, ctx: dict) -> CheckResult:
+    """Compare this vintage against the same series from Geostat's PX-Web API.
+
+    Two independent publications of one survey, reached by two code paths that
+    share nothing: one parses a spreadsheet grid, the other reads a JSON API.
+    A parser that took the wrong column would sail through every other check in
+    this file - the values would be real numbers, in range, gapless, correctly
+    united - and would disagree with the API immediately.
+
+    The comparison is bounded by rounding rather than exact, because PX-Web
+    publishes one decimal place and the spreadsheets carry full precision. The
+    tolerance is half the last published digit, which is the largest gap
+    rounding alone can produce; it is derived, not tuned.
+    """
+    api_rows = ctx.get("api_rows")
+    if api_rows is None:
+        return _ok(
+            c,
+            "no second source supplied for this dataset; agreement not exercised",
+            0,
+        )
+
+    def index(rows):
+        return {
+            (r["indicator_code"], r["breakdown_code"], r["period"]): r["value"]
+            for r in rows if r.get("value") is not None
+        }
+
+    sheet, api = index(ctx["rows"]), index(api_rows)
+    shared = sheet.keys() & api.keys()
+    if not shared:
+        return _bad(
+            c,
+            "the two sources share no comparable cell, so nothing was checked. "
+            "That is a join failure, not agreement.",
+            [{"_problem": "no overlapping (indicator, breakdown, period)"}],
+            0,
+        )
+
+    offenders = []
+    for key in sorted(shared):
+        gap = abs(sheet[key] - api[key])
+        if gap > SOURCE_AGREEMENT_TOLERANCE:
+            offenders.append({
+                "indicator_code": key[0], "breakdown_code": key[1],
+                "period": key[2], "value": sheet[key],
+                "_problem": (
+                    f"spreadsheet {sheet[key]:.4f} against API {api[key]:.4f}, "
+                    f"a difference of {gap:.4f}"
+                ),
+            })
+    if offenders:
+        return _bad(
+            c,
+            f"{len(offenders)} of {len(shared)} shared cells differ between the "
+            f"published spreadsheet and the PX-Web API by more than "
+            f"{SOURCE_AGREEMENT_TOLERANCE}. One of the two readings is wrong "
+            "and this check cannot say which.",
+            offenders, len(shared),
+        )
+    return _ok(
+        c,
+        f"all {len(shared)} cells shared with the PX-Web API agree within "
+        f"{SOURCE_AGREEMENT_TOLERANCE} (the API rounds to one decimal place)",
+        len(shared),
+    )
+
+
 def _cross_alignment(c: Contract, ctx: dict) -> CheckResult:
     rows = ctx["rows"]
     cpi_rows = ctx.get("cpi_rows")
@@ -457,6 +730,45 @@ def _cross_alignment(c: Contract, ctx: dict) -> CheckResult:
         if r["indicator_code"] == "cpi_annual_avg_2010_100"
         and r["breakdown_code"] == "georgia" and r.get("value") is not None
     }
+    cpi_months = {
+        r["period"] for r in cpi_rows
+        if r["indicator_code"] == "cpi_2010_100"
+        and r["breakdown_code"] == "georgia" and r.get("value") is not None
+    }
+    wage_quarters = {
+        r["period"] for r in rows
+        if r["unit"] == "GEL" and _quarterly(r["period"])
+        and r.get("value") is not None
+    }
+    if wage_quarters:
+        # A quarter can only be deflated if all three of its months are
+        # published; averaging two of them would compare a partial quarter's
+        # prices with a full quarter's wages.
+        unmatched = sorted(
+            q for q in wage_quarters
+            if not all(
+                f"{q[:4]}-{month:02d}" in cpi_months
+                for month in range((int(q[-1]) - 1) * 3 + 1, int(q[-1]) * 3 + 1)
+            )
+        )
+        if unmatched:
+            return _bad(
+                c,
+                f"{len(unmatched)} wage quarters have no complete three-month "
+                "CPI window to deflate against: " + ", ".join(unmatched[:8])
+                + ". Real-terms figures for those quarters cannot be computed "
+                "and must not be shown.",
+                [{"period": q, "_problem": "incomplete CPI quarter"}
+                 for q in unmatched],
+                len(wage_quarters),
+            )
+        return _ok(
+            c,
+            f"all {len(wage_quarters)} wage quarters join to a complete "
+            "three-month CPI window",
+            len(wage_quarters),
+        )
+
     wage_years = {
         r["period"] for r in rows
         if r["unit"] == "GEL" and _annual(r["period"]) and r.get("value") is not None
@@ -513,9 +825,63 @@ CONTRACTS: list[Contract] = [
              "Deflating wages by CPI requires both series to cover the same "
              "years; a partial join silently shortens the real-terms chart.",
              _cross_alignment),
+    Contract("SOURCE_AGREEMENT", "Agreement with the PX-Web API",
+             "The same survey is published twice, as a spreadsheet and as an "
+             "API. A parser reading the wrong column passes every other check "
+             "and fails this one.", _source_agreement),
+    Contract("IDENTITY", "Published identities between measures",
+             "The source states relationships between its own rows. Checking "
+             "them catches values read into the wrong row, which every "
+             "single-value check passes.", _identity),
 ]
 
 CONTRACTS_BY_CODE = {c.code: c for c in CONTRACTS}
+
+
+# Checks that are red on the committed data because the published statistics
+# really are like that. Each one is a limitation the analytics has to respect,
+# and tuning the check until the page went green would hide it. The test suite
+# asserts that nothing fails which is not listed here, so this table is the
+# only way a red check is allowed to exist.
+KNOWN_FAILURES: dict[tuple[str, str], str] = {
+    ("earnings_annual", "JOIN"):
+        "The CPI series begins in 2000 and earnings begin in 1995, so wages "
+        "for 1995-1999 cannot be deflated at all. Those five years are shown "
+        "as n/a rather than estimated.",
+    ("earnings_by_sex", "JOIN"):
+        "Same five undeflatable years as the headline earnings series.",
+    ("earnings_by_activity", "JOIN"):
+        "Same five undeflatable years as the headline earnings series.",
+    ("labour_force_by_region", "COVERAGE"):
+        "Geostat published the hired / self-employed / not-identified split by "
+        "region up to 2009, stopped for 2010-2019, and resumed in 2020. The "
+        "core indicators - employed, unemployed, and the three rates - are "
+        "complete across 2003-2025; only the employment-status split has the "
+        "hole, and it is the source's, not the parser's.",
+    ("household_income", "TEMPORAL"):
+        "Property disposal and property income are lumpy survey categories: a "
+        "single household in a regional sample selling land moves the regional "
+        "monthly average by an order of magnitude. Four steps are flagged and "
+        "all four are published figures, not parse errors.",
+    ("gender_pay_gap", "TEMPORAL"):
+        "The adjusted hourly gap for service and sales workers falls from "
+        "5.0% to 0.25% between 2023 and 2024. It is flagged and unexplained: "
+        "treat that single cell with care rather than assuming either a defect "
+        "or a real convergence.",
+    ("tourism_by_region", "COVERAGE"):
+        "The visitor survey was suspended from 2020-Q2 to 2021-Q4. The seven "
+        "missing quarters are the pandemic, and any growth rate computed "
+        "across them would silently span two years.",
+    ("tourism_by_region", "TEMPORAL"):
+        "Declared hotel guests in Kakheti rise 10.9x between 2009 and 2010. "
+        "Whether that is a real tourism boom or a change in who declared is "
+        "not stated in the file, so the check is left red.",
+}
+
+
+def known_failure(dataset_id: str, code: str) -> str:
+    """Why this red check is expected, or '' if it is a genuine surprise."""
+    return KNOWN_FAILURES.get((dataset_id, code), "")
 
 
 def run_contracts(
@@ -524,10 +890,12 @@ def run_contracts(
     dataset_id: str = "",
     cpi_rows: list[dict] | None = None,
     prior_rows: list[dict] | None = None,
+    api_rows: list[dict] | None = None,
 ) -> list[CheckResult]:
     ctx = {
         "rows": rows, "dataset_id": dataset_id,
         "cpi_rows": cpi_rows, "prior_rows": prior_rows,
+        "api_rows": api_rows,
     }
     schema = CONTRACTS_BY_CODE["SCHEMA"].run(ctx)
     results = [schema]

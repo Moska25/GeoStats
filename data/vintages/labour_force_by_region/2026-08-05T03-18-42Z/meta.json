@@ -1,0 +1,17 @@
+{
+  "dataset_id": "labour_force_by_region",
+  "vintage_id": "2026-08-05T03-18-42Z",
+  "title": "Labour force indicators by region",
+  "source_url": "https://geostat.ge/media/78739/05-Labour-Force-Indicators-by-regions.xlsx",
+  "source_page": "https://www.geostat.ge/en/modules/categories/683/dasakmeba-umushevroba",
+  "retrieved_at": "2026-08-05T03:18:42+00:00",
+  "http_status": 200,
+  "byte_size": 55086,
+  "sha256": "502baf07875d7200d457efcf847e73d97029daa25bf5681138b6ecee0aa1e59e",
+  "row_count": 2261,
+  "period_grain": "annual",
+  "unit_family": "thousand_persons",
+  "note": "Published one block per year, and the set of regions changes: 2003-2010 fold several into 'The remaining regions'. Unlike the earnings file this is a household survey, so a person is counted where they live, not where their employer is registered.",
+  "user_agent": "browser User-Agent required; Geostat returns 0 bytes without one",
+  "retrieval_via": "direct fetch from geostat.ge"
+}

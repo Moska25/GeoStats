@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img"
+     aria-label="GeoStats">
+  <!-- Paper, ink and a stepped series: the same four bars as the currency-era
+       exhibit, with the last one in the accent because it is the only one in
+       Lari. -->
+  <rect width="32" height="32" rx="6" fill="#faf7f2"/>
+  <rect x="5"  y="19" width="4" height="8"  fill="#9c8e78"/>
+  <rect x="11" y="15" width="4" height="12" fill="#9c8e78"/>
+  <rect x="17" y="11" width="4" height="16" fill="#9c8e78"/>
+  <rect x="23" y="6"  width="4" height="21" fill="#1d4ed8"/>
+  <rect x="4"  y="27.5" width="24" height="1.2" fill="#16181d"/>
+</svg>

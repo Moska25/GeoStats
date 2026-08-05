@@ -1,0 +1,17 @@
+{
+  "dataset_id": "household_income",
+  "vintage_id": "2026-08-05T03-36-49Z",
+  "title": "Average monthly household income by region",
+  "source_url": "https://geostat.ge/media/79265/106_Distribution-of-average-monthly-incomes-per-household-by-regions.xlsx",
+  "source_page": "https://www.geostat.ge/en/modules/categories/50/households-income",
+  "retrieved_at": "2026-08-05T03:36:49+00:00",
+  "http_status": 200,
+  "byte_size": 55076,
+  "sha256": "25469f5fdf7a722044e7592ac04c4e7047b1ad3da3948b1d30cd8af31e137d37",
+  "row_count": 2925,
+  "period_grain": "annual",
+  "unit_family": "GEL_per_household_month",
+  "note": "Self-reported in the Household Incomes and Expenditures Survey and known to understate income. It is not comparable with the earnings series: that one counts a job, this one counts a household and includes pensions, transfers and own produce.",
+  "user_agent": "browser User-Agent required; Geostat returns 0 bytes without one",
+  "retrieval_via": "direct fetch from geostat.ge"
+}

@@ -1,0 +1,17 @@
+{
+  "dataset_id": "population",
+  "vintage_id": "2026-08-05T03-18-47Z",
+  "title": "Population by region and municipality, 1 January",
+  "source_url": "https://geostat.ge/media/78356/01-population-by-self-governed-unit.xlsx",
+  "source_page": "https://www.geostat.ge/en/modules/categories/41/population",
+  "retrieved_at": "2026-08-05T03:18:47+00:00",
+  "http_status": 200,
+  "byte_size": 34994,
+  "sha256": "8bd7a1b56e756e8d6bc92192095795b204b23fd18274aaff39b78c0b0a487a57",
+  "row_count": 2904,
+  "period_grain": "annual",
+  "unit_family": "thousand_persons",
+  "note": "Regions and their municipalities share one column, distinguished only by the cell indent. Rebased on the 2024 census, so the whole series was revised. Occupied territories are carried at their last enumerated figures.",
+  "user_agent": "browser User-Agent required; Geostat returns 0 bytes without one",
+  "retrieval_via": "direct fetch from geostat.ge"
+}

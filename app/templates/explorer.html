@@ -5,40 +5,85 @@
 {% block content %}
 <div class="page-head">
   <h1>{{ t('page.explorer') }}</h1>
-  <p class="lede">Nominal, CPI-deflated real, and median earnings side by side.
-    The year range defaults to the Lari era ({{ gel_era_start }} onward) because
-    earlier columns are denominated in three other currencies.</p>
+  <p class="lede">Every series in every committed vintage, addressable by URL.
+    The selection below is the whole state of this page: copy the address and it
+    reopens exactly here, or take the same rows as CSV with their units,
+    vintages and caveats attached.</p>
 </div>
 
 <form class="card" method="get" action="/explorer">
   {% if lang != 'en' %}<input type="hidden" name="lang" value="{{ lang }}">{% endif %}
   <div class="toolbar">
     <div class="field">
-      <label for="breakdown">Breakdown</label>
-      <select id="breakdown" name="breakdown">
-        {% for code, label in breakdown_choices %}
-        <option value="{{ code }}" {{ 'selected' if code == breakdown }}>{{ label }}</option>
+      <label for="dataset">{{ t('m.dataset') }}</label>
+      <select id="dataset" name="dataset" onchange="this.form.submit()">
+        {% for code, title in datasets %}
+        <option value="{{ code }}" {{ 'selected' if code == sel.dataset }}>{{ title }}</option>
         {% endfor %}
       </select>
     </div>
     <div class="field">
-      <label for="year_from">{{ t('m.year') }} from</label>
-      <select id="year_from" name="year_from">
-        {% for y in universe %}<option value="{{ y }}" {{ 'selected' if y == year_from }}>{{ y }}</option>{% endfor %}
+      <label for="indicator">{{ t('m.indicator') }}</label>
+      <select id="indicator" name="indicator" onchange="this.form.submit()">
+        {% for row in sel.indicator_rows %}
+        <option value="{{ row.indicator_code }}" {{ 'selected' if row.indicator_code == sel.indicator }}>
+          {{ row.indicator_label or row.indicator_code }}
+        </option>
+        {% endfor %}
       </select>
     </div>
     <div class="field">
-      <label for="year_to">{{ t('m.year') }} to</label>
-      <select id="year_to" name="year_to">
-        {% for y in universe %}<option value="{{ y }}" {{ 'selected' if y == year_to }}>{{ y }}</option>{% endfor %}
+      <label for="breakdown">{{ t('m.breakdown') }}</label>
+      <select id="breakdown" name="breakdown">
+        {% for row in sel.breakdown_rows %}
+        <option value="{{ row.breakdown_code }}" {{ 'selected' if row.breakdown_code == sel.breakdown }}>
+          {{ row.breakdown_label or row.breakdown_code }}
+        </option>
+        {% endfor %}
       </select>
     </div>
+    {# Always rendered, even with one option: it names the grain being read,
+       and it keeps `grain` in the query string so a shared URL reopens on the
+       same periods rather than on whatever the default resolves to. #}
+    <div class="field">
+      <label for="grain">Grain</label>
+      <select id="grain" name="grain">
+        {% for g in sel.available_grains %}
+        <option value="{{ g }}" {{ 'selected' if g == sel.grain }}>{{ g }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="year_from">{{ t('m.period') }} from</label>
+      <select id="year_from" name="year_from">
+        {% for p in sel.universe %}<option value="{{ p }}" {{ 'selected' if p == sel.period_from }}>{{ p }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="year_to">{{ t('m.period') }} to</label>
+      <select id="year_to" name="year_to">
+        {% for p in sel.universe %}<option value="{{ p }}" {{ 'selected' if p == sel.period_to }}>{{ p }}</option>{% endfor %}
+      </select>
+    </div>
+    {% if deflatable %}
     <div class="field">
       <label for="base">Deflation base</label>
       <select id="base" name="base">
         {% for y in base_choices %}<option value="{{ y }}" {{ 'selected' if y == base }}>{{ y }}</option>{% endfor %}
       </select>
     </div>
+    {% endif %}
+    {% if sel.vintages|length > 1 %}
+    <div class="field">
+      <label for="vintage">Vintage</label>
+      <select id="vintage" name="vintage">
+        {% for v in sel.vintages|reverse %}
+        <option value="{{ v }}" {{ 'selected' if v == sel.vintage }}>{{ v }}{{ ' (current)' if loop.first }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    {% if sel.is_currency_era and sel.grain == 'annual' %}
     <div class="field">
       <label for="include_pre_gel">Pre-{{ gel_era_start }} columns</label>
       <select id="include_pre_gel" name="include_pre_gel">
@@ -46,107 +91,110 @@
         <option value="1" {{ 'selected' if include_pre_gel }}>Included (not comparable)</option>
       </select>
     </div>
+    {% endif %}
     <button class="btn btn-primary" type="submit">Apply</button>
+    <a class="btn" href="/explorer{{ csv_query }}">{{ t('m.download') }}</a>
   </div>
 </form>
 
 {% if mixed_era %}
-<p class="note note-warn" style="margin-top:14px">
+<p class="note note-warn mt-4">
   <strong>This selection mixes currency eras.</strong> It spans
   {% for u in units %}<span class="tag">{{ u }}</span> {% endfor %}
-  &mdash; {{ units|map('length')|list|length }} different currencies. The line below
-  is drawn because you asked for it, but the values are not comparable and no
-  growth rate across the boundary means anything. This is exactly the state the
+  &mdash; {{ units|length }} different currencies. The line below is drawn
+  because you asked for it, but the values are not comparable and no growth rate
+  across the boundary means anything. This is exactly the state the
   <code>CURRENCY_ERA</code> contract fails on.
 </p>
 {% endif %}
 
-<div style="margin-top:14px">
-{% call m.exhibit(1, 'Earnings ' ~ year_from ~ ' to ' ~ year_to ~ ', ' ~
-    (breakdown_choices | selectattr(0, 'equalto', breakdown) | map(attribute=1) | first | lower) ~
-    ', with the currency in force beneath',
-    source='Geostat, average monthly nominal earnings, annual. Vintage ' ~ vintage_id ~
-           '. Real series deflated by the CPI annual average, ' ~ base ~ ' prices.') %}
-<div class="card">
-  {{ m.chart(chart, show_legend=false, bands=era_bands) }}
-  {{ m.era_band(era_bands, chart.width, currency_name) }}
-  {{ m.legend(chart) }}
-  <p class="note {{ 'note-warn' if era_bands|length > 1 }}" style="margin:14px 0 0">
-    <strong>The band is the currency actually in force.</strong>
-    {% if era_bands|length > 1 %}
-      This selection crosses {{ era_bands|length }} of them, and the shaded spans
-      above are shaded because they are <em>not</em> Lari. A line drawn across
-      that boundary is drawing Roubles, Coupons and Lari as though they were one
-      quantity; the {{ gel_era_start }} step is a redenomination, not a wage
-      collapse. Nothing here converts between eras, because Geostat publishes no
-      conversion series and inventing one would be fabrication.
-    {% else %}
-      Every year plotted is denominated in {{ currency_name(era_bands[0].code) if era_bands else 'one currency' }},
-      so the line is a comparable series. Add the pre-{{ gel_era_start }} columns
-      above and the band splits into the four currencies the workbook actually
-      holds.
+{% for brk in breaks %}
+<p class="note note-warn mt-4">
+  <strong>This series breaks between {{ brk.before }} and {{ brk.after }}.</strong>
+  {{ brk.why }}
+</p>
+{% endfor %}
+
+{% if sel.vintage != sel.vintages[-1] %}
+<p class="note note-warn mt-4">
+  <strong>You are reading a superseded vintage.</strong> {{ sel.vintage }} is not
+  the current release of this dataset; {{ sel.vintages[-1] }} is. The figures
+  below are what Geostat published at that retrieval, kept exactly as they
+  arrived. That is the point of keeping them.
+</p>
+{% endif %}
+
+<section class="section mt-5">
+  <div class="section-head">
+    <h2>{{ sel.indicator.replace('_', ' ')|capitalize }}</h2>
+    <span class="tag">{{ unit or units|join(', ') }} · {{ sel.picked|length }} periods</span>
+  </div>
+
+  {% call m.exhibit(1,
+      (sel.indicator_rows|selectattr('indicator_code', 'equalto', sel.indicator)|map(attribute='indicator_label')|first or sel.indicator)
+        ~ ', ' ~ (sel.breakdown_rows|selectattr('breakdown_code', 'equalto', sel.breakdown)|map(attribute='breakdown_label')|first or sel.breakdown)
+        ~ ', ' ~ sel.period_from ~ '-' ~ sel.period_to,
+      source='Geostat, ' ~ adapter.title|lower ~ '. Vintage ' ~ vintage_id ~ '.') %}
+  <div class="card">
+    {{ m.chart(chart) }}
+    {% if era_bands %}
+    {{ m.era_band(era_bands, chart.width, currency_name) }}
     {% endif %}
-  </p>
-  <p class="note" style="margin:14px 0 0">
-    <strong>Real is nominal with prices removed.</strong> Real GEL =
-    nominal × (CPI<sub>{{ base }}</sub> / CPI<sub>t</sub>), so the real line is
-    stated in {{ base }} prices. Years with no CPI annual average show
-    <span class="faint">n/a</span> rather than being dropped &mdash; a shortened
-    chart hides the gap, a blank cell shows it.
-  </p>
-</div>
-{% endcall %}
-</div>
+    {% if deflatable %}
+    <p class="footnote">The real line is the published figure deflated to
+      {{ base }} prices using the CPI annual average. Years the CPI does not
+      reach are drawn as gaps rather than extrapolated: the CPI series begins in
+      2000 and no amount of wanting a longer line changes that.</p>
+    {% endif %}
+  </div>
+  {% endcall %}
+</section>
 
 <section class="section">
-  <div class="section-head"><h2>Series table</h2>
-    <span class="tag">{{ series|length }} rows</span></div>
+  <div class="section-head"><h2>The rows behind the line</h2>
+    <span class="tag">{{ sel.picked|length }} observations</span></div>
   <div class="card card-tight">
     <div class="table-wrap">
       <table class="data">
-          <caption class="visually-hidden">Nominal, real, median, index and year-on-year values for each year in the selected range</caption>
+        <caption class="visually-hidden">Selected observations with unit, raw cell and parse status</caption>
         <thead>
           <tr>
-            <th>{{ t('m.year') }}</th>
-            <th class="num">{{ t('m.nominal') }}</th>
-            <th class="num">Real ({{ base }})</th>
-            <th class="num">{{ t('m.median') }}</th>
-            <th class="num">Nom. index</th>
-            <th class="num">Real index</th>
-            <th class="num">Nom. YoY</th>
-            <th class="num">Real YoY</th>
+            <th>{{ t('m.period') }}</th>
+            <th class="num">{{ t('m.value') }}</th>
+            {% if deflatable %}<th class="num">Real, {{ base }}</th>{% endif %}
+            <th>{{ t('m.unit') }}</th>
+            <th>Raw cell</th>
             <th>Status</th>
           </tr>
         </thead>
         <tbody>
-        {% for r in series %}
+          {% for row in series %}
           <tr>
-            <td class="mono">{{ r.period }}</td>
-            <td class="num">{{ m.num(r.nominal) }}</td>
-            <td class="num">{{ m.num(r.real_gel) }}</td>
-            <td class="num">{{ m.num(r.median) }}</td>
-            <td class="num">{{ m.num(r.nominal_index, 1) }}</td>
-            <td class="num">{{ m.num(r.real_index, 1) }}</td>
-            <td class="num">{% if r.nominal_yoy is not none %}{{ '%+.1f'|format(r.nominal_yoy) }}%{% else %}<span class="faint">n/a</span>{% endif %}</td>
-            <td class="num">{% if r.real_yoy is not none %}{{ '%+.1f'|format(r.real_yoy) }}%{% else %}<span class="faint">n/a</span>{% endif %}</td>
-            <td>
-              {% if r.is_preliminary %}<span class="pill pill-warn">{{ t('q.preliminary') }}</span>
-              {% elif r.cpi is none %}<span class="pill pill-idle">no CPI</span>
-              {% else %}<span class="pill pill-pass">{{ t('q.final') }}</span>{% endif %}
-            </td>
+            <td>{{ row.period }}{% if row.preliminary %}
+              <span class="pill pill-warn">{{ t('q.preliminary') }}</span>{% endif %}</td>
+            <td class="num">{{ m.num(row.value) }}</td>
+            {% if deflatable %}<td class="num">{{ m.num(row.real) }}</td>{% endif %}
+            <td>{{ row.unit }}</td>
+            <td class="mono faint">{{ row.raw or '—' }}</td>
+            <td>{{ row.status }}</td>
           </tr>
-        {% else %}
-          <tr><td colspan="9"><div class="empty">No published values in this range.</div></td></tr>
-        {% endfor %}
+          {% endfor %}
         </tbody>
       </table>
     </div>
   </div>
+  <p class="footnote">The raw column is exactly what the workbook cell held, so
+    a published gap reads as the marker Geostat printed rather than as a zero.
+    The CSV download carries these same rows with the dataset, vintage, unit and
+    preliminary flag attached, because a figure that loses its caveats on the
+    way into a spreadsheet is how a caveated number becomes an uncaveated one.</p>
+
   {{ m.provenance([
-      ('dataset', 'earnings_annual'),
-      ('breakdown', breakdown),
-      ('vintage', vintage_id),
-      ('CPI', 'cpi_2010_base, annual average of 12 monthly indices'),
+      ('dataset', sel.dataset),
+      ('indicator', sel.indicator),
+      ('breakdown', sel.breakdown),
+      ('grain', sel.grain),
+      ('vintage', sel.vintage),
       ('source', source_url),
   ]) }}
 </section>

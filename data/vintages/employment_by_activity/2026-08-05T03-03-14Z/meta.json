@@ -1,0 +1,17 @@
+{
+  "dataset_id": "employment_by_activity",
+  "vintage_id": "2026-08-05T03-03-14Z",
+  "title": "Employed persons by economic activity",
+  "source_url": "https://geostat.ge/media/78741/07-Employment-by-branch-NACE_Eng.xlsx",
+  "source_page": "https://www.geostat.ge/en/modules/categories/683/dasakmeba-umushevroba",
+  "retrieved_at": "2026-08-05T03:03:14+00:00",
+  "http_status": 200,
+  "byte_size": 24810,
+  "sha256": "bc57965fde2eb23f96f8ae11459c0f97e7f5366472eca6642899adbd277a2f1e",
+  "row_count": 244,
+  "period_grain": "annual",
+  "unit_family": "thousand_persons",
+  "note": "Head counts, not earnings: the denominator behind the wage series. NACE rev.1 stops at 2020 and rev.2 starts at 2017; they overlap but are not splice-compatible.",
+  "user_agent": "browser User-Agent required; Geostat returns 0 bytes without one",
+  "retrieval_via": "direct fetch from geostat.ge"
+}

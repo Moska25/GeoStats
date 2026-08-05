@@ -1,0 +1,17 @@
+{
+  "dataset_id": "earnings_quarterly",
+  "vintage_id": "2026-08-05T03-18-41Z",
+  "title": "Average monthly nominal earnings by economic activity, quarterly",
+  "source_url": "https://geostat.ge/media/80118/04-earnings-quarterly.xlsx",
+  "source_page": "https://www.geostat.ge/en/modules/categories/39/wages",
+  "retrieved_at": "2026-08-05T03:18:41+00:00",
+  "http_status": 200,
+  "byte_size": 49764,
+  "sha256": "733836c6ca650f2ea9e376fe428ef2b9904a332c5cd17cc394a4af2d795093d0",
+  "row_count": 1812,
+  "period_grain": "quarterly",
+  "unit_family": "currency_era",
+  "note": "The same earnings measured four times a year. Georgian wages carry a strong fourth-quarter bonus effect, so Q4 against Q3 is seasonality, not growth; compare a quarter with the same quarter a year earlier.",
+  "user_agent": "browser User-Agent required; Geostat returns 0 bytes without one",
+  "retrieval_via": "direct fetch from geostat.ge"
+}

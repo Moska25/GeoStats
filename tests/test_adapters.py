@@ -169,3 +169,46 @@ def test_cpi_2010_annual_average_is_exactly_the_base():
         and r.breakdown_code == "georgia" and r.period == "2010"
     )
     assert value == pytest.approx(100.0, abs=0.01)
+
+
+# -- labour force: head counts and rates share one sheet -------------------
+
+@pytest.fixture(scope="module")
+def labour_force_rows():
+    vintage = latest_vintage("labour_force")
+    assert vintage, "no committed vintage for labour_force"
+    return ADAPTERS["labour_force"].parse(read_raw("labour_force", vintage))
+
+
+def test_labour_force_rates_are_percent_and_counts_are_head_counts(
+    labour_force_rows,
+):
+    """The sheet mixes units in one column of rows. Reading the rate rows as
+    thousands of people would put a 13.9% unemployment rate on the same axis as
+    a 1.4 million head count."""
+    unit_of = {r.indicator_code: r.unit for r in labour_force_rows}
+    assert unit_of["unemployment_rate_percentage"] == "percent"
+    assert unit_of["employment_rate_percentage"] == "percent"
+    assert unit_of["labour_force_participation_rate_percentage"] == "percent"
+    assert unit_of["employed"] == "thousand_persons"
+    assert unit_of["total_15_population"] == "thousand_persons"
+
+
+@pytest.mark.parametrize("code,year,expected", [
+    ("unemployment_rate_percentage", "2025", 13.8815),
+    ("employed", "2025", 1389.6525),
+    ("total_15_population", "2024", 2975.2467),
+])
+def test_published_labour_force_values(labour_force_rows, code, year, expected):
+    match = [
+        r for r in labour_force_rows
+        if r.indicator_code == code and r.period == year
+    ]
+    assert len(match) == 1
+    assert match[0].value == pytest.approx(expected, abs=0.001)
+
+
+def test_labour_force_carries_no_monetary_unit(labour_force_rows):
+    """A head count stamped GEL would sail through the currency-era contract,
+    which only inspects monetary rows."""
+    assert {r.unit for r in labour_force_rows} == {"percent", "thousand_persons"}

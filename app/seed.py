@@ -14,9 +14,22 @@ import sys
 from . import db
 from .contracts import run_contracts
 from .ingest import all_datasets, list_vintages, read_meta, read_rows
+from .pxweb import snapshot_rows_by_dataset
 
 
-def seed(verbose: bool = True) -> dict:
+def seed(verbose: bool = True, api_rows_by_dataset: dict | None = None) -> dict:
+    """Rebuild the read index.
+
+    `api_rows_by_dataset` optionally supplies the PX-Web reading of a dataset so
+    SOURCE_AGREEMENT can run. It is passed in rather than fetched here because
+    seeding must stay offline: the committed vintages are the source of truth
+    and a rebuild cannot depend on a network round trip.
+    """
+    # Default to the committed API snapshots. They are files on disk like the
+    # vintages are, so seeding stays offline and SOURCE_AGREEMENT is a check
+    # the running application performs rather than a script somebody once ran.
+    if api_rows_by_dataset is None:
+        api_rows_by_dataset = snapshot_rows_by_dataset()
     conn = db.connect()
     db.reset(conn)
 
@@ -49,11 +62,14 @@ def seed(verbose: bool = True) -> dict:
             )
             conn.executemany(
                 """INSERT OR REPLACE INTO observations (dataset_id, indicator_code,
-                       breakdown_code, breakdown_label, period, unit, value, raw,
-                       status, is_preliminary, vintage_id)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                       indicator_label, breakdown_code, breakdown_label, period,
+                       unit, value, raw, status, is_preliminary, vintage_id)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
                 [
-                    (r["dataset_id"], r["indicator_code"], r["breakdown_code"],
+                    # .get on indicator_label: vintages committed before the
+                    # field existed are still authoritative and must load.
+                    (r["dataset_id"], r["indicator_code"],
+                     r.get("indicator_label", ""), r["breakdown_code"],
                      r["breakdown_label"], r["period"], r["unit"], r["value"],
                      r["raw"], r["status"], int(bool(r["is_preliminary"])),
                      r["vintage_id"])
@@ -66,6 +82,9 @@ def seed(verbose: bool = True) -> dict:
             results = run_contracts(
                 rows, dataset_id=dataset_id,
                 cpi_rows=cpi_rows, prior_rows=prior_rows,
+                api_rows=(
+                    api_rows_by_dataset.get(dataset_id) if is_latest else None
+                ),
             )
             conn.executemany(
                 """INSERT OR REPLACE INTO contract_runs (dataset_id, vintage_id,

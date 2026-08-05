@@ -27,7 +27,7 @@
     <div class="metric-sub">{{ totals.passed }}/{{ totals.total }} on latest vintages</div></div>
 </div>
 
-<p class="note" style="margin-top:14px">
+<p class="note mt-4">
   <strong>The failing checks are real and deliberate.</strong> The
   <code>JOIN</code> contract fails on three wage datasets because the CPI series
   begins in 2000 while earnings go back to 1995: those five years genuinely
@@ -35,9 +35,23 @@
   hide a limitation the analytics have to respect.
 </p>
 
+{% if overdue %}
+<p class="note note-warn">
+  <strong>{{ overdue|length }} dataset{{ '' if overdue|length == 1 else 's' }}
+  {{ 'has' if overdue|length == 1 else 'have' }} not published the period
+  {{ 'it' if overdue|length == 1 else 'they' }} should have.</strong>
+  {% for card in overdue %}<code>{{ card.dataset_id }}</code>{% if not loop.last %}, {% endif %}{% endfor %}.
+  This is a statement about the source, not about this application: the files
+  behind those datasets have not been updated, and refreshing would fetch the
+  same bytes. Several are the detailed earnings breakdowns, which Geostat
+  publishes a year behind the headline annual figure.
+</p>
+<p class="footnote">{{ no_feed_reason }}</p>
+{% endif %}
+
 <section class="section">
 {% for card in cards %}
-  <div class="card card-tight" style="margin-bottom:14px">
+  <div class="card card-tight mb-5">
     <div class="card-head">
       <h2><a href="/reliability/{{ card.dataset_id }}{{ qs }}">{{ card.adapter.title }}</a></h2>
       {% if not card.empty %}
@@ -45,6 +59,9 @@
         <span class="pill {{ 'pill-pass' if card.passed == card.total else 'pill-warn' }}">
           {{ card.passed }}/{{ card.total }} {{ t('q.checks') }}</span>
         <span class="tag">{{ card.vintage_count }} {{ t('q.vintages')|lower }}</span>
+        {% if card.expectation and card.expectation.overdue %}
+        <span class="pill pill-warn">{{ card.expectation.summary }}</span>
+        {% endif %}
       </span>
       {% endif %}
     </div>
@@ -52,9 +69,14 @@
     <div class="card-body"><div class="empty">No vintage committed for this dataset.</div></div>
     {% else %}
     <div class="card-body">
-      <p class="small muted" style="margin-bottom:14px">{{ card.adapter.note }}</p>
+      <p class="small muted mb-5">{{ card.adapter.note }}</p>
       <dl class="kv">
         <dt>Latest period</dt><dd>{{ card.latest_period }}</dd>
+        {% if card.expectation %}
+        <dt>Next expected</dt>
+        <dd>{{ card.expectation.expected_period or 'n/a' }}
+          <span class="faint">({{ card.expectation.cadence }})</span></dd>
+        {% endif %}
         <dt>{{ t('q.retrieved') }}</dt><dd>{{ card.meta.retrieved_at }}</dd>
         <dt>{{ t('q.vintage') }}</dt><dd>{{ card.meta.vintage_id }}</dd>
         <dt>sha256</dt><dd>{{ card.meta.sha256 }}</dd>
@@ -64,15 +86,15 @@
         <dd>{% if card.preliminary %}{{ card.preliminary|join(', ') }}{% else %}none{% endif %}</dd>
         <dt>{{ t('q.source') }}</dt><dd><a href="{{ card.meta.source_url }}">{{ card.meta.source_url }}</a></dd>
       </dl>
-      <div class="row" style="margin-top:14px">
-        <div class="bar {{ 'bar-pass' if card.passed == card.total else 'bar-warn' }}" style="flex:1 1 200px">
+      <div class="row mt-4">
+        <div class="bar {{ 'bar-pass' if card.passed == card.total else 'bar-warn' }} bar-flex">
           <span style="width: {{ card.rate }}%"></span>
         </div>
         <span class="small faint">{{ '%.0f'|format(card.rate) }}% {{ t('q.pass_rate')|lower }}</span>
       </div>
-      <div class="row" style="margin-top:14px">
+      <div class="row mt-4">
         <a class="btn btn-sm" href="/reliability/{{ card.dataset_id }}{{ qs }}">Vintages and diffs</a>
-        <form method="post" action="/refresh" style="display:inline">
+        <form method="post" action="/refresh" class="form-inline">
           <input type="hidden" name="dataset_id" value="{{ card.dataset_id }}">
           <button class="btn btn-sm" type="submit">{{ t('q.refresh') }}</button>
         </form>
@@ -81,7 +103,7 @@
       {% if failing %}
       <div class="hr"></div>
       {% for c in failing %}
-        <p class="small" style="margin-bottom:6px"><span class="pill pill-fail">{{ c.code }}</span>
+        <p class="small mb-1"><span class="pill pill-fail">{{ c.code }}</span>
           <span class="muted">{{ c.message }}</span></p>
       {% endfor %}
       {% endif %}
@@ -110,7 +132,7 @@
       </table>
     </div>
   </div>
-  <p class="small faint" style="margin-top:10px">
+  <p class="small faint mt-2">
     Every one of these is exercised by the <a href="/lab{{ qs }}">fault lab</a>,
     which injects the specific defect each check is designed to catch.
   </p>

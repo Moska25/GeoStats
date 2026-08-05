@@ -9,8 +9,8 @@
     application.</p>
 </div>
 
-<div class="card" style="margin-top:14px">
-  <h2 style="margin-bottom:10px">Everything that does exist</h2>
+<div class="card mt-4">
+  <h2 class="mb-3">Everything that does exist</h2>
   <ul class="notfound-nav">
     {% for href, label in nav %}
     <li><a href="{{ href }}{{ '?lang=' ~ lang if lang != 'en' else '' }}">{{ label }}</a></li>

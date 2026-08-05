@@ -5,120 +5,288 @@
 {% block content %}
 <div class="page-head">
   <h1>{{ t('page.regions') }}</h1>
-  <p class="lede">The eleven regions ranked for one year, each indexed against the
-    national figure published in the same release. Nothing here is modelled: the
-    index divides two numbers that arrived in one workbook.</p>
+  <p class="lede">Eight measures across Georgia's eleven regions, drawn from six
+    separate Geostat workbooks that agree on what a region is only because a
+    registry makes them. There is no composite score here: the components are
+    shown and the weighing is left to whoever is reading.</p>
 </div>
 
-<form class="card" method="get" action="/regions" style="margin-top:14px">
+<form class="card mt-4" method="get" action="/regions">
   {% if lang != 'en' %}<input type="hidden" name="lang" value="{{ lang }}">{% endif %}
   <div class="toolbar">
+    <div class="field">
+      <label for="metric">Measure</label>
+      <select id="metric" name="metric">
+        {% for opt in metrics %}
+        <option value="{{ opt.key }}" {{ 'selected' if opt.key == metric.key }}>{{ opt.label }}</option>
+        {% endfor %}
+      </select>
+    </div>
     <div class="field field-year">
-      <label for="year">{{ t('m.year') }}</label>
+      <label for="year">{{ t('m.period') }}</label>
       <select id="year" name="year">
-        {% for y in years %}<option value="{{ y }}" {{ 'selected' if y == year }}>{{ y }}</option>{% endfor %}
+        {% for p in periods %}<option value="{{ p }}" {{ 'selected' if p == year }}>{{ p }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="region">{{ t('m.region') }}</label>
+      <select id="region" name="region">
+        <option value="">None &mdash; show the country</option>
+        {% for code, label in regions %}
+        <option value="{{ code }}" {{ 'selected' if code == region }}>{{ label }}</option>
+        {% endfor %}
       </select>
     </div>
     <button class="btn btn-primary" type="submit">Apply</button>
-    <span class="small faint">national {{ m.num(national) }} GEL{% if prelim %} ·
-      <span class="pill pill-warn">{{ t('q.preliminary') }}</span>{% endif %}</span>
+    <a class="btn" href="/regions?metric={{ metric.key }}&amp;year={{ year }}&amp;region={{ region }}&amp;format=csv">{{ t('m.download') }}</a>
   </div>
 </form>
 
-<p class="note note-warn" style="margin-top:14px">
-  <strong>Read Tbilisi with care.</strong> {{ adapter.note }} A head office in
-  Tbilisi puts its whole payroll in Tbilisi, wherever the work happens, so this
-  is a map of where employers are registered as much as a map of what places
-  pay. Geostat publishes no correction for it and neither does this page.
+{% if metric.note %}
+<p class="note note-warn mt-4">
+  <strong>{{ metric.label }}.</strong> {{ metric.note }}
 </p>
+{% endif %}
+
+<section class="section">
+  <div class="section-head"><h2>{{ metric.label }}, {{ year }}</h2>
+    <span class="tag">{{ metric.unit }}</span></div>
+
+  {% call m.exhibit(1, metric.label ~ ' by region, ' ~ year,
+      source='Geostat, ' ~ adapter.title|lower ~ '. Vintage ' ~ vintage_id ~
+             '. Equal-area tile cartogram, not a boundary map.') %}
+  <div class="card">
+    <svg class="atlas" viewBox="0 0 {{ tiles.width }} {{ tiles.height }}"
+         role="img" preserveAspectRatio="xMidYMid meet"
+         aria-label="{{ metric.label }} by region, {{ year }}, as an equal-area tile cartogram">
+      {% for cell in tiles.cells %}
+      <g>
+        <rect class="atlas-tile {{ 'is-empty' if cell.intensity is none }}
+                     {{ 'is-dark' if cell.intensity is not none and cell.intensity > 0.62 }}
+                     {{ 'is-selected' if cell.selected }}"
+              x="{{ cell.x }}" y="{{ cell.y }}"
+              width="{{ cell.size }}" height="{{ cell.size }}"
+              fill="{{ 'transparent' if cell.intensity is none else
+                       'color-mix(in srgb, var(--series-1) ' ~ (12 + cell.intensity * 78)|round|int ~ '%, var(--surface))' }}">
+          <title>{{ cell.label }}: {{ cell.text }} {{ metric.unit }}</title>
+        </rect>
+        <text class="atlas-name" x="{{ cell.x + 7 }}" y="{{ cell.y + 17 }}">
+          {{ cell.label }}
+        </text>
+        <text class="atlas-value" x="{{ cell.x + 7 }}" y="{{ cell.y + 40 }}">
+          {{ cell.text }}
+        </text>
+      </g>
+      {% endfor %}
+    </svg>
+    <div class="atlas-scale">
+      <span>lower</span>
+      <span class="atlas-ramp" aria-hidden="true">
+        {% for step in range(6) %}
+        <span style="background: color-mix(in srgb, var(--series-1) {{ 12 + step * 16 }}%, var(--surface))"></span>
+        {% endfor %}
+      </span>
+      <span>higher</span>
+      <span class="faint">shaded by rank, not by value</span>
+    </div>
+    <p class="footnote"><strong>This is a cartogram, not a map.</strong> Every
+      region gets one equal square regardless of its land area, so
+      Racha-Lechkhumi is as visible as Kvemo Kartli and the picture is about
+      people rather than hectares. The rows run roughly north to south and the
+      columns roughly west to east. Shading is by rank rather than by value:
+      Tbilisi is so far above the rest on most of these measures that a linear
+      ramp would render eleven regions in one shade and the capital in another,
+      which is a picture of the outlier, not of the country.</p>
+  </div>
+  {% endcall %}
+</section>
 
 {% if ranked %}
-<div class="section">
-{% call m.exhibit(1, 'Average monthly nominal earnings by region, ' ~ year,
-    source='Geostat, ' ~ adapter.title|lower ~ '. Vintage ' ~ vintage_id ~
-           '. Gross, before personal income tax.') %}
-  <div class="card">
-    <ol class="rank">
-      {% for r in ranked %}
-      <li class="{{ 'is-above' if r.index and r.index >= 100 else '' }}">
-        <span class="rank-no">{{ r.rank }}</span>
-        <span class="rank-label">{{ r.label }}</span>
-        <span class="rank-bar" aria-hidden="true">
-          <span style="width: {{ bars[loop.index0].pct }}%"></span>
-        </span>
-        <span class="rank-value">{{ m.num(r.value) }}</span>
-        <span class="rank-index">{{ '%.1f'|format(r.index) if r.index else 'n/a' }}</span>
-      </li>
-      {% endfor %}
-    </ol>
-    <p class="footnote">Bars are drawn to the highest region in the selected
-      year. The last column is the region as an index of the national figure,
-      where the country as a whole is 100.</p>
-  </div>
-{% endcall %}
-</div>
-
-{% if spread %}
 <section class="section">
-  <div class="section-head"><h2>The spread over time</h2>
-    <span class="tag">{{ spread[0].period }}&ndash;{{ spread[-1].period }}</span></div>
-  {% call m.exhibit(2, 'Highest and lowest region against the national figure, ' ~
-      spread[0].period ~ ' to ' ~ spread[-1].period,
-      source='Geostat, ' ~ adapter.title|lower ~ '. Each point is that year\'s ' ~
-             'region divided by that year\'s national figure, both from the same release.') %}
+  <div class="section-head"><h2>Ranked</h2>
+    <span class="tag">{{ ranked|length }} regions{% if national %} · Georgia = 100{% endif %}</span></div>
+  <div class="card card-tight">
+    <div class="table-wrap">
+      <table class="data">
+        <caption class="visually-hidden">{{ metric.label }} by region for {{ year }}</caption>
+        <thead>
+          <tr>
+            <th class="num">Rank</th>
+            <th>{{ t('m.region') }}</th>
+            <th class="num">{{ metric.unit }}</th>
+            <th class="num">Index, Georgia = 100</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in ranked %}
+          <tr>
+            <td class="num">{{ row.rank }}</td>
+            <td class="wrap">
+              <a href="/regions?metric={{ metric.key }}&amp;year={{ year }}&amp;region={{ row.code }}{{ '&amp;lang=' ~ lang if lang != 'en' }}">{{ row.label }}</a>
+            </td>
+            <td class="num">{{ metric.fmt.format(row.value) }}</td>
+            <td class="num">{{ row.index if row.index else 'n/a' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% if national %}
+  <p class="footnote">The index divides the region by the national figure
+    published in the same release, so both numbers come from one file and one
+    vintage. Abkhazia is excluded from the ranking: it is published, but its
+    figures cover a handful of registered units rather than the territory.</p>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if not scatter.empty %}
+<section class="section">
+  <div class="section-head"><h2>Pay against unemployment</h2>
+    <span class="tag">{{ scatter_year }} · sized by population</span></div>
+
+  {% call m.exhibit(2, 'Average monthly earnings against the unemployment rate, ' ~ scatter_year,
+      source='Geostat: regional earnings, labour force indicators by region, ' ~
+             'and population. All three read for ' ~ scatter_year ~ '.') %}
   <div class="card">
-    {{ m.chart(spread_chart) }}
-    <p class="footnote">Both ends move: the highest region is
-      {{ spread[-1].top_label }} in {{ spread[-1].period }} and
-      {{ spread[0].top_label }} in {{ spread[0].period }}, so this is the spread
-      between the extremes in each year, not the history of one place. The
-      dashed line is the national figure at 100 by construction. No trend is
-      fitted and none is claimed.</p>
+    <svg class="chart" viewBox="0 0 {{ scatter.width }} {{ scatter.height }}"
+         role="img" preserveAspectRatio="xMidYMid meet"
+         aria-label="Scatterplot of regional earnings against unemployment, point area proportional to population">
+      {% for tick in scatter.y_ticks %}
+      <line class="grid-line" x1="{{ scatter.plot_left }}" y1="{{ tick.y }}"
+            x2="{{ scatter.plot_right }}" y2="{{ tick.y }}"></line>
+      <text class="axis-text" x="{{ scatter.plot_left - 6 }}" y="{{ tick.y + 3 }}"
+            text-anchor="end">{{ tick.label }}</text>
+      {% endfor %}
+      {% for tick in scatter.x_ticks %}
+      <text class="axis-text" x="{{ tick.x }}" y="{{ scatter.plot_bottom + 15 }}"
+            text-anchor="middle">{{ tick.label }}</text>
+      {% endfor %}
+      {% for p in scatter.points %}
+      <circle class="scatter-point {{ 'is-highlight' if p.highlight }}"
+              cx="{{ p.cx }}" cy="{{ p.cy }}" r="{{ p.r }}">
+        <title>{{ p.label }}: {{ '%.0f'|format(p.x) }} GEL, {{ '%.1f'|format(p.y) }}% unemployment</title>
+      </circle>
+      <text class="scatter-label" x="{{ p.cx }}" y="{{ p.cy - p.r - 3 }}"
+            text-anchor="middle">{{ p.label[:11] }}</text>
+      {% endfor %}
+      <text class="axis-caption" x="{{ (scatter.plot_left + scatter.plot_right) / 2 }}"
+            y="{{ scatter.height - 6 }}" text-anchor="middle">{{ scatter.x_label }}</text>
+    </svg>
+    <p class="footnote">Point area is proportional to population, not radius: a
+      region with twice the people covers twice the ink. No line is fitted and
+      no correlation is claimed. The two axes come from different instruments -
+      earnings from the enterprise survey, unemployment from the household
+      survey - so a region can sit high on both without either number being
+      wrong.</p>
   </div>
   {% endcall %}
 </section>
 {% endif %}
 
+{% if fingerprint %}
 <section class="section">
-  <div class="section-head"><h2>The ranking as a table</h2>
-    <span class="tag">{{ ranked|length }} regions · national = 100</span></div>
+  <div class="section-head"><h2>{{ region_label }} against Georgia</h2>
+    <span class="tag">each measure indexed, country = 100</span></div>
+
+  {% call m.exhibit(3, region_label ~ ' as an index of the national figure, every measure',
+      source='Geostat, six workbooks. Each row uses that measure\'s own latest ' ~
+             'published period, shown in the table.') %}
+  <div class="card">
+    <div class="fingerprint">
+      {% for row in fingerprint %}
+      <div class="fingerprint-row">
+        <span>{{ row.label }} <span class="faint">{{ row.period }}</span></span>
+        <span class="fingerprint-track">
+          <span class="fingerprint-fill {{ 'is-below' if row.index < 100 }}"
+                style="{% if row.index >= 100 %}left:50%;width:{{ [(row.index - 100) / 2, 50]|min }}%
+                       {% else %}right:50%;width:{{ [(100 - row.index) / 2, 50]|min }}%{% endif %}"></span>
+        </span>
+        <span class="diverge-value">{{ row.index }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    <p class="footnote">Each bar is this region divided by Georgia for that
+      measure, with the centre line at 100. The rows use different periods
+      because the six source workbooks are published on different schedules, and
+      the period is printed next to each one rather than quietly aligned. There
+      is deliberately no combined score: adding an unemployment rate to a
+      tourism count requires weights, and inventing weights would bury the
+      judgement inside a number.</p>
+  </div>
+  {% endcall %}
+
   <div class="card card-tight">
     <div class="table-wrap">
       <table class="data">
-          <caption class="visually-hidden">Regions ranked by average monthly nominal earnings, with each region indexed against the national figure</caption>
+        <caption class="visually-hidden">{{ region_label }} against Georgia across every measure</caption>
         <thead>
           <tr>
-            <th class="num">Rank</th>
-            <th>{{ t('m.region') }}</th>
-            <th class="num">GEL / month</th>
-            <th class="num">Index, national = 100</th>
-            <th class="num">Difference</th>
+            <th>Measure</th><th class="num">{{ t('m.period') }}</th>
+            <th class="num">{{ region_label }}</th><th class="num">Georgia</th>
+            <th class="num">Index</th><th>{{ t('m.unit') }}</th>
           </tr>
         </thead>
         <tbody>
-        {% for r in ranked %}
+          {% for row in fingerprint %}
           <tr>
-            <td class="num">{{ r.rank }}</td>
-            <td class="wrap">{{ r.label }}</td>
-            <td class="num">{{ m.num(r.value) }}</td>
-            <td class="num">{{ '%.1f'|format(r.index) if r.index else 'n/a' }}</td>
-            <td class="num">{{ '{:+,.2f}'.format(r.value - national) if national else 'n/a' }}</td>
+            <td class="wrap">{{ row.label }}</td>
+            <td class="num">{{ row.period }}</td>
+            <td class="num">{{ m.num(row.value, 1) }}</td>
+            <td class="num">{{ m.num(row.national, 1) }}</td>
+            <td class="num">{{ row.index }}</td>
+            <td class="wrap faint">{{ row.unit }}</td>
           </tr>
-        {% endfor %}
+          {% endfor %}
         </tbody>
       </table>
     </div>
   </div>
-  {{ m.provenance([
-      ('dataset', 'earnings_by_region'),
-      ('indicator', 'avg_monthly_nominal_earnings'),
-      ('period', year),
-      ('unit', 'GEL'),
-      ('vintage', vintage_id),
-      ('source', adapter.url),
-  ]) }}
 </section>
-{% else %}
-<div class="empty" style="margin-top:14px">No regional values published for {{ year }}.</div>
+
+{% if profile %}
+<section class="section">
+  <div class="section-head"><h2>{{ region_label }} over time</h2>
+    <span class="tag">{{ metric.label }}</span></div>
+  {% call m.exhibit(4, region_label ~ ' and Georgia, ' ~ metric.label|lower,
+      source='Geostat, ' ~ adapter.title|lower ~ '. Vintage ' ~ vintage_id ~ '.') %}
+  <div class="card">
+    {{ m.chart(profile) }}
+  </div>
+  {% endcall %}
+</section>
 {% endif %}
+{% endif %}
+
+{% if spread and spread.spread %}
+<section class="section">
+  <div class="section-head"><h2>The spread over time</h2>
+    <span class="tag">{{ spread.spread[0].period }}&ndash;{{ spread.spread[-1].period }}</span></div>
+  {% call m.exhibit(5, 'Highest and lowest region against the national figure, ' ~
+      spread.spread[0].period ~ ' to ' ~ spread.spread[-1].period,
+      source='Geostat, average monthly nominal earnings by region. Each point is ' ~
+             'that year\'s region divided by that year\'s national figure, both ' ~
+             'from the same release.') %}
+  <div class="card">
+    {{ m.chart(spread.chart) }}
+    <p class="footnote">Both ends move: the highest region is
+      {{ spread.spread[-1].top_label }} in {{ spread.spread[-1].period }} and
+      {{ spread.spread[0].top_label }} in {{ spread.spread[0].period }}, so this
+      is the spread between the extremes in each year, not the history of one
+      place. The dashed line is the national figure at 100 by construction. No
+      trend is fitted and none is claimed.</p>
+  </div>
+  {% endcall %}
+</section>
+{% endif %}
+
+{{ m.provenance([
+    ('dataset', metric.dataset),
+    ('indicator', metric.indicator),
+    ('period', year),
+    ('unit', metric.unit),
+    ('vintage', vintage_id),
+    ('source', adapter.url),
+]) }}
 {% endblock %}

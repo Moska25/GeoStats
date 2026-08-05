@@ -22,8 +22,10 @@ import re
 import sqlite3
 from dataclasses import dataclass, field
 
-from . import db, metrics
-from .adapters import ADAPTERS, GEL_ERA_START, currency_for_year, currency_name
+from . import db, geography, metrics
+from .adapters import (
+    ADAPTERS, GEL_ERA_START, currency_for_year, currency_name, spans_a_break,
+)
 
 CPI_DATASET = "cpi_2010_base"
 CPI_INDICATOR = "cpi_annual_avg_2010_100"
@@ -33,6 +35,12 @@ WAGE_INDICATOR = "avg_monthly_nominal_earnings"
 MEDIAN_DATASET = "median_earnings"
 MEDIAN_INDICATOR = "median_monthly_earnings"
 REGION_DATASET = "earnings_by_region"
+LABOUR_DATASET = "labour_force"
+INCOME_DATASET = "household_income"
+EXPENDITURE_DATASET = "household_expenditure"
+POPULATION_DATASET = "population"
+BUSINESS_DATASET = "business_demography"
+TOURISM_DATASET = "tourism_by_region"
 
 GROSS_CAVEAT = (
     "Gross, before personal income tax. Computed as the earnings fund divided "
@@ -644,8 +652,317 @@ def _unavailable(q: str, intent: str, available: dict, wanted: list[str]) -> Ans
     )
 
 
+def _labour(conn, indicator: str, breakdown: str = "country.georgia") -> dict[str, float]:
+    return db.value_map(conn, LABOUR_DATASET, indicator, breakdown)
+
+
+def _intent_unemployment(conn, q: str, years: list[str]) -> Answer | None:
+    """Unemployment, employment and participation rates, straight from the LFS.
+
+    No arithmetic beyond reading the published figure: these are rates Geostat
+    publishes directly, and deriving them again from the counts would produce a
+    second number that disagrees with the official one in the fourth decimal.
+    """
+    # No trailing \b on the group: "unemploy" is a stem, and a word boundary
+    # cannot match between "unemploy" and the "m" of "unemployment".
+    matched = re.search(
+        r"\b(unemploy\w*|jobless|employment rate|participation rate|"
+        r"labou?r force|(?:how many|number of) (?:people )?(?:were )?employ\w*)\b",
+        q,
+    )
+    if not matched:
+        return None
+    # "How many people were unemployed" wants the head count; "what is the
+    # unemployment rate" wants the rate. Answering one with the other is the
+    # kind of near-miss that reads as correct and is not.
+    wants_count = bool(re.search(r"\b(how many|number of|count)\b", q))
+    if re.search(r"\b(unemploy\w*|jobless)\b", q):
+        indicator, name, unit = (
+            ("unemployed", "number of unemployed people", "thousand_persons")
+            if wants_count else
+            ("unemployment_rate_percentage", "unemployment rate", "percent")
+        )
+    elif wants_count and re.search(r"\bemploy\w*\b", q):
+        indicator, name, unit = (
+            "employed", "number of employed people", "thousand_persons")
+    elif "participation" in q:
+        indicator, name, unit = (
+            "labour_force_participation_rate_percentage",
+            "labour force participation rate", "percent")
+    elif "employment rate" in q:
+        indicator, name, unit = (
+            "employment_rate_percentage", "employment rate", "percent")
+    else:
+        indicator, name, unit = (
+            "labour_force", "labour force", "thousand_persons")
+
+    values = _labour(conn, indicator)
+    if not values:
+        return None
+    year = next((y for y in years if y in values), None) or _latest_year(values)
+    if year is None:
+        return None
+    if years and year not in values:
+        return _unavailable(q, "labour_force_indicator", values, years)
+
+    employed = _labour(conn, "employed").get(year)
+    unemployed = _labour(conn, "unemployed").get(year)
+    suffix = "%" if unit == "percent" else " thousand people"
+    broken = spans_a_break(LABOUR_DATASET, min(values), year)
+    return Answer(
+        kind="answer", question=q, intent="labour_force_indicator",
+        headline=f"The {name} in {year} was {values[year]:,.1f}{suffix}.",
+        formula=f"published directly by Geostat; no derivation applied",
+        explanation=(
+            f"From the Labour Force Survey, which counts people where they "
+            f"live rather than where their employer is registered. "
+            + (
+                f"{employed:,.0f} thousand people were employed and "
+                f"{unemployed:,.0f} thousand unemployed in {year}."
+                if employed is not None and unemployed is not None else ""
+            )
+        ),
+        caveat=(
+            (
+                f"The series breaks between {broken['before']} and "
+                f"{broken['after']} on the {broken['what']}: figures either "
+                f"side of that boundary count different people, so a "
+                f"comparison across it is not a change in the labour market. "
+                if broken else ""
+            )
+            + "Unemployment is a share of the labour force, not of the "
+              "population, so it can rise while employment rises too."
+        ),
+        provenance=[_prov(conn, LABOUR_DATASET, indicator, "country.georgia",
+                          year, unit)],
+        table=[
+            {"label": f"{name.capitalize()} {year}",
+             "value": f"{values[year]:,.2f}{suffix}"},
+        ] + ([
+            {"label": f"Employed {year}", "value": f"{employed:,.1f} thousand"},
+            {"label": f"Unemployed {year}", "value": f"{unemployed:,.1f} thousand"},
+        ] if employed is not None and unemployed is not None else []),
+    )
+
+
+def _intent_household(conn, q: str, years: list[str]) -> Answer | None:
+    """Household income and expenditure, and the difference between them."""
+    if not re.search(r"\bhousehold|spend|spending|expenditure|income\b", q):
+        return None
+    if re.search(r"\bearn|wage|salary|pay\b", q) and "household" not in q:
+        return None                       # that is the earnings series, not this
+    income = db.value_map(
+        conn, INCOME_DATASET, "income_total", "country.georgia")
+    spend = db.value_map(
+        conn, EXPENDITURE_DATASET, "expenditure_total", "country.georgia")
+    shared = sorted(set(income) & set(spend))
+    if not shared:
+        return None
+    year = next((y for y in years if y in shared), None) or shared[-1]
+    if years and year not in shared:
+        return _unavailable(q, "household_balance", income, years)
+
+    gap = income[year] - spend[year]
+    return Answer(
+        kind="answer", question=q, intent="household_balance",
+        headline=(
+            f"In {year} the average household reported {income[year]:,.0f} GEL "
+            f"a month of income and {spend[year]:,.0f} GEL of expenditure."
+        ),
+        formula=f"difference = income - expenditure = {gap:+,.2f} GEL",
+        explanation=(
+            "Both figures are self-reported in the Household Incomes and "
+            "Expenditures Survey, per household per month, and both are "
+            "published directly."
+        ),
+        caveat=(
+            "The difference between them is NOT a savings rate, a deficit or a "
+            "surplus. Households under-report income more than they "
+            "under-report spending in surveys of this kind, so the gap is "
+            "mostly a reporting artefact. It is also not comparable with the "
+            "earnings series: that one counts a job, this one counts a "
+            "household and includes pensions, transfers and own produce."
+        ),
+        provenance=[
+            _prov(conn, INCOME_DATASET, "income_total", "country.georgia",
+                  year, "GEL_per_household_month"),
+            _prov(conn, EXPENDITURE_DATASET, "expenditure_total",
+                  "country.georgia", year, "GEL_per_household_month"),
+        ],
+        table=[
+            {"label": f"Reported income {year}", "value": f"{income[year]:,.2f} GEL"},
+            {"label": f"Reported expenditure {year}", "value": f"{spend[year]:,.2f} GEL"},
+            {"label": "Difference", "value": f"{gap:+,.2f} GEL"},
+        ],
+    )
+
+
+def _intent_population(conn, q: str, years: list[str]) -> Answer | None:
+    if not re.search(r"\bpopulation|how many people|inhabitants\b", q):
+        return None
+    values = db.value_map(
+        conn, POPULATION_DATASET, "population_1_january", "country.georgia")
+    if not values:
+        return None
+    year = next((y for y in years if y in values), None) or _latest_year(values)
+    if years and year not in values:
+        return _unavailable(q, "population", values, years)
+    return Answer(
+        kind="answer", question=q, intent="population",
+        headline=(
+            f"Georgia's population on 1 January {year} was "
+            f"{values[year]:,.1f} thousand people."
+        ),
+        formula="published directly by Geostat; no derivation applied",
+        explanation=(
+            "Resident population as of 1 January, excluding the occupied "
+            "territories, which are carried at their last enumerated figures."
+        ),
+        caveat=(
+            "The series was rebased on the 2024 census, so every earlier year "
+            "was revised. A figure quoted from an older release will not match."
+        ),
+        provenance=[_prov(conn, POPULATION_DATASET, "population_1_january",
+                          "country.georgia", year, "thousand_persons")],
+        table=[{"label": f"Population {year}",
+                "value": f"{values[year]:,.1f} thousand"}],
+    )
+
+
+def _intent_business(conn, q: str, years: list[str]) -> Answer | None:
+    if not re.search(r"\b(enterprise|business|firm|compan)\w*\b", q):
+        return None
+    births = db.value_map(
+        conn, BUSINESS_DATASET, "enterprise_births", "country.georgia")
+    active = db.value_map(
+        conn, BUSINESS_DATASET, "active_enterprises", "country.georgia")
+    deaths = db.value_map(
+        conn, BUSINESS_DATASET, "enterprise_deaths", "country.georgia")
+    if not births:
+        return None
+    year = next((y for y in years if y in births), None) or _latest_year(births)
+    if years and year not in births:
+        return _unavailable(q, "business_demography", births, years)
+    return Answer(
+        kind="answer", question=q, intent="business_demography",
+        headline=(
+            f"{births[year]:,.0f} enterprises were born and "
+            f"{deaths.get(year, 0):,.0f} died in {year}, against "
+            f"{active.get(year, 0):,.0f} active."
+        ),
+        formula=(
+            f"birth rate = births / active * 100 = "
+            f"{births[year]:,.0f} / {active.get(year, 1):,.0f} * 100"
+        ),
+        explanation=(
+            "Business demography counts registrations, not economic activity."
+        ),
+        caveat=(
+            "An individual entrepreneur registering counts the same as a "
+            "factory opening, and enterprises are attributed to their "
+            "registered address rather than where they operate."
+        ),
+        provenance=[_prov(conn, BUSINESS_DATASET, "enterprise_births",
+                          "country.georgia", year, "enterprises")],
+        table=[
+            {"label": f"Active {year}", "value": f"{active.get(year, 0):,.0f}"},
+            {"label": f"Births {year}", "value": f"{births[year]:,.0f}"},
+            {"label": f"Deaths {year}", "value": f"{deaths.get(year, 0):,.0f}"},
+        ],
+    )
+
+
+def _intent_tourism(conn, q: str, years: list[str]) -> Answer | None:
+    """Which regions visitors go to, domestic against inbound.
+
+    The two are answered together because the interesting thing is the
+    difference: Georgians and foreign visitors do not go to the same places,
+    and either series alone invites the reader to assume they do.
+    """
+    if not re.search(r"\b(touris\w*|visit\w*|hotel\w*|guest\w*)\b", q):
+        return None
+
+    quarters = db.periods_for(conn, TOURISM_DATASET, "domestic_visits")
+    if not quarters:
+        return None
+    asked = [y for y in years]
+    period = next(
+        (q_ for q_ in reversed(quarters) if not asked or q_[:4] in asked), None
+    )
+    if period is None:
+        return _unavailable(
+            q, "tourism_by_region",
+            {p: 1.0 for p in quarters}, asked,
+        )
+
+    domestic = db.cross_section(conn, TOURISM_DATASET, "domestic_visits", period)
+    inbound = db.cross_section(conn, TOURISM_DATASET, "inbound_visits", period)
+    regional = {
+        code: value for code, value in domestic.items()
+        if code.startswith("region.")
+    }
+    if not regional:
+        return None
+    top_domestic = max(regional, key=regional.get)
+    inbound_regions = {
+        code: v for code, v in inbound.items() if code.startswith("region.")
+    }
+    top_inbound = (
+        max(inbound_regions, key=inbound_regions.get) if inbound_regions else None
+    )
+
+    table = [
+        {"label": geography.display_name(code),
+         "value": f"{regional[code]:,.1f} thousand"}
+        for code in sorted(regional, key=lambda c: -regional[c])[:6]
+    ]
+    same = top_inbound == top_domestic
+    return Answer(
+        kind="answer", question=q, intent="tourism_by_region",
+        headline=(
+            f"In {period} the most-visited region for Georgian residents was "
+            f"{geography.display_name(top_domestic)} at "
+            f"{regional[top_domestic]:,.1f} thousand visits a month"
+            + (
+                f", and for inbound visitors "
+                f"{geography.display_name(top_inbound)} at "
+                f"{inbound_regions[top_inbound]:,.1f} thousand."
+                if top_inbound else "."
+            )
+        ),
+        formula="published directly by Geostat; no derivation applied",
+        explanation=(
+            "Monthly average number of visits by visitors aged 15 and over, "
+            "estimated quarterly from the visitor survey. "
+            + (
+                "Domestic and inbound visitors concentrate on the same region."
+                if same else
+                "Domestic and inbound visitors concentrate on different "
+                "regions, which is why the two series are reported separately "
+                "rather than added together."
+            )
+        ),
+        caveat=(
+            "A visit is not a visitor and not a night: one person making three "
+            "trips is three visits. The survey was suspended from 2020-Q2 to "
+            "2021-Q4, so any comparison spanning the pandemic crosses seven "
+            "missing quarters."
+        ),
+        provenance=[
+            _prov(conn, TOURISM_DATASET, "domestic_visits", top_domestic,
+                  period, "thousand_visits"),
+        ],
+        table=table,
+    )
+
+
 INTENTS = [
     ("purchasing_power", _intent_purchasing_power),
+    ("tourism_by_region", _intent_tourism),
+    ("labour_force_indicator", _intent_unemployment),
+    ("household_balance", _intent_household),
+    ("population", _intent_population),
+    ("business_demography", _intent_business),
     ("real_earnings_index", _intent_real_wage),
     ("cumulative_inflation", _intent_inflation),
     ("gender_gap", _intent_gender_gap),
@@ -665,6 +982,22 @@ APPROVED_METRICS = [
     ("metrics.yoy_growth", "(current / previous - 1) * 100"),
     ("metrics.real_growth", "((W_t / W_p) / (CPI_t / CPI_p) - 1) * 100"),
     ("metrics.nominal_index", "W_t / W_base * 100"),
+    ("metrics.household_balance", "reported income - reported expenditure"),
+    ("metrics.enterprise_birth_rate", "births / active * 100"),
+    ("metrics.share_of", "part / total * 100"),
+]
+
+
+# Answers that read a figure Geostat publishes directly rather than deriving
+# one. They are listed apart from APPROVED_METRICS on purpose: there is no
+# formula to check, and claiming one would invent a derivation that does not
+# happen. Re-deriving an official rate from official counts would also produce
+# a second number that disagrees with the first in the fourth decimal.
+DIRECT_READS = [
+    ("labour_force_indicator",
+     "unemployment, employment and participation rates as published"),
+    ("population", "resident population as of 1 January, as published"),
+    ("tourism_by_region", "monthly average visits by region, as published"),
 ]
 
 
@@ -720,5 +1053,11 @@ EXAMPLES = [
     "What does a software engineer earn in Imereti?",
     "What is the average take-home pay after tax in 2024?",
     "What will the average wage be in 2030?",
+    "What was the unemployment rate in 2024?",
+    "What is the labour force participation rate?",
+    "What does a household spend per month in 2024?",
+    "What is Georgia's population?",
+    "How many enterprises were born in 2023?",
+    "Which region gets the most tourism?",
     "What is the median wage in Adjara?",
 ]

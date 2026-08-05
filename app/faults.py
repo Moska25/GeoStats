@@ -16,6 +16,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
@@ -25,7 +26,9 @@ from .ingest import (
     REPO_ROOT, copy_vintage_to, read_raw, read_rows, VINTAGE_ROOT, diff_rows,
 )
 
-LAB_DIR = REPO_ROOT / "data" / "cache" / "lab"
+# Scratch space for injected copies - never read back, never committed. Same
+# reason as GEOSTATS_DB: a read-only application directory needs it elsewhere.
+LAB_DIR = Path(os.environ.get("GEOSTATS_LAB_DIR") or REPO_ROOT / "data" / "cache" / "lab")
 
 
 @dataclass
@@ -35,6 +38,11 @@ class Fault:
     real_world: str          # the mistake this imitates
     targets: str             # contract code expected to catch it
     apply: Callable[[list[dict]], tuple[list[dict], str]]
+    # Dataset this fault needs in order to bite. Most faults work on anything
+    # with numbers in it; an identity can only be broken where the source
+    # declares one, and a currency era can only be mislabelled where more than
+    # one era was published.
+    requires_dataset: str = ""
 
 
 # --------------------------------------------------------------------------
@@ -169,6 +177,86 @@ def _mislabel_era(rows):
     )
 
 
+def _impossible_rate(rows):
+    """Push a percentage past 100.
+
+    Separate from `negative_wage` because it fails a different way: a negative
+    wage is caught by the lower bound and could plausibly come from a sign
+    error, while a 150% unemployment rate is caught by the upper bound and is
+    what a ratio computed against the wrong denominator looks like - dividing
+    the unemployed by the employed rather than by the labour force, say.
+    """
+    out = copy.deepcopy(rows)
+    for r in out:
+        if r.get("unit") == "percent" and r.get("value") is not None:
+            original = r["value"]
+            r["value"] = 150.0
+            return out, (
+                f"set {r['indicator_code']} for {r['period']} to 150%, up from "
+                f"{original:.2f}%, as a rate divided by the wrong denominator "
+                f"would read"
+            )
+    return out, "this dataset publishes no percentage values to push out of range"
+
+
+def _drift_from_source(rows):
+    """Shift every value a little, as a wrong scale factor would.
+
+    A 2% drift is neither out of range nor a 10x step, so RANGE and TEMPORAL
+    both stay green. `IDENTITY` also catches it here, because scaling a rate
+    and its own components by the same factor breaks the ratio between them -
+    which is worth saying rather than claiming this fault is only visible to
+    the second source. What SOURCE_AGREEMENT adds is that it would still catch
+    the drift on a dataset declaring no identity at all.
+    """
+    out = copy.deepcopy(rows)
+    n = 0
+    for r in out:
+        if r.get("value") is not None:
+            r["value"] *= 1.02
+            n += 1
+    return out, (
+        f"multiplied all {n} values by 1.02, as a wrong scale factor or a "
+        f"stale revision would. Every value stays inside its range and no step "
+        f"exceeds the temporal threshold, so no single-source magnitude check "
+        f"sees it."
+    )
+
+
+def _break_identity(rows):
+    """Update one component and leave the total it feeds stale.
+
+    This is the defect no single-value check can see. Every number stays inside
+    its plausible range, the schema is intact, no period is missing and no unit
+    moved - only the arithmetic between two rows that the source itself says
+    must agree is now wrong.
+    """
+    from .contracts import IDENTITIES
+
+    dataset_ids = {r.get("dataset_id") for r in rows}
+    identity = next(
+        (i for i in IDENTITIES if i.dataset_id in dataset_ids and i.kind == "sum"),
+        None,
+    )
+    if identity is None:
+        return rows, "this dataset declares no additive identity to break"
+
+    out = copy.deepcopy(rows)
+    part = identity.parts[0]
+    for r in out:
+        if r["indicator_code"] == part and r.get("value"):
+            original = r["value"]
+            r["value"] = original * 1.2
+            return out, (
+                f"raised {part} for {r['breakdown_label']} {r['period']} from "
+                f"{original:.4g} to {r['value']:.4g} without touching "
+                f"{identity.target}, as a partial re-import that refreshed one "
+                f"measure and left its total stale would. The source states "
+                f"{identity.describe()}."
+            )
+    return out, f"no {part} value available to alter"
+
+
 FAULTS: list[Fault] = [
     Fault("duplicate_year", "Duplicate a year",
           "An append-only loader re-run after a partial failure.",
@@ -197,6 +285,19 @@ FAULTS: list[Fault] = [
     Fault("mislabel_era", "Mislabel the currency era",
           "Treating 1970-1994 columns as lari because the footnote was skipped.",
           "CURRENCY_ERA", _mislabel_era),
+    Fault("drift_from_source", "Drift 2% away from the API",
+          "A wrong scale factor, or a spreadsheet that is one revision behind "
+          "the database it should match.",
+          "SOURCE_AGREEMENT", _drift_from_source,
+          requires_dataset="labour_force_by_region"),
+    Fault("impossible_rate", "Push a rate past 100%",
+          "A ratio computed against the wrong denominator: the unemployed "
+          "divided by the employed rather than by the labour force.",
+          "RANGE", _impossible_rate, requires_dataset="labour_force"),
+    Fault("break_identity", "Refresh one measure, leave its total stale",
+          "A partial re-import updates employment but not the labour force "
+          "total that contains it.",
+          "IDENTITY", _break_identity, requires_dataset="labour_force"),
 ]
 
 FAULTS_BY_ID = {f.fault_id: f for f in FAULTS}
@@ -231,9 +332,18 @@ def inject(
         json.dumps(mutated, ensure_ascii=False) + "\n"
     )
 
-    before = run_contracts(original, dataset_id=dataset_id, cpi_rows=cpi_rows)
+    # The committed PX-Web snapshot, where one exists, so the lab can
+    # demonstrate SOURCE_AGREEMENT without reaching the network.
+    from .pxweb import read_snapshot
+
+    found = read_snapshot(dataset_id)
+    api_rows = found[0] if found else None
+
+    before = run_contracts(
+        original, dataset_id=dataset_id, cpi_rows=cpi_rows, api_rows=api_rows)
     after = run_contracts(
-        mutated, dataset_id=dataset_id, cpi_rows=cpi_rows, prior_rows=original
+        mutated, dataset_id=dataset_id, cpi_rows=cpi_rows, prior_rows=original,
+        api_rows=api_rows,
     )
 
     before_failed = {r.code for r in before if not r.passed}
@@ -261,7 +371,10 @@ def inject(
         "results_after": after,
         "row_delta": len(mutated) - len(original),
         "diff": diff_rows(original, mutated),
-        "copy_path": str(work.relative_to(REPO_ROOT)),
+        # Shown to the reader, so it is relative when the scratch dir is inside
+        # the repo (the default) and absolute when GEOSTATS_LAB_DIR moved it out.
+        "copy_path": str(work.relative_to(REPO_ROOT))
+        if work.is_relative_to(REPO_ROOT) else str(work),
         "original_sha256": sha_before,
         "original_sha256_after_run": sha_after,
         "vintage_unchanged": sha_before == sha_after,

@@ -1,0 +1,17 @@
+{
+  "dataset_id": "tourism_by_region",
+  "vintage_id": "2026-08-05T03-18-51Z",
+  "title": "Tourism visits, hotels and guests by region",
+  "source_url": "https://geostat.ge/media/81807/tourism_regions.xlsx",
+  "source_page": "https://www.geostat.ge/en/modules/categories/93/regional-statistics",
+  "retrieved_at": "2026-08-05T03:18:51+00:00",
+  "http_status": 200,
+  "byte_size": 41110,
+  "sha256": "3471709729aae3ef1077a9adcea5b805d1b83b2700dcae6ffe8d6b9f9356dc9f",
+  "row_count": 1353,
+  "period_grain": "mixed",
+  "unit_family": "thousand_visits",
+  "note": "Visits are quarterly survey estimates; hotels and guests are annual declared administrative counts. The 2020 and 2021 collapse is the pandemic and is left in place rather than smoothed.",
+  "user_agent": "browser User-Agent required; Geostat returns 0 bytes without one",
+  "retrieval_via": "direct fetch from geostat.ge"
+}

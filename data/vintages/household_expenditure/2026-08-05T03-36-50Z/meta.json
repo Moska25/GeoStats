@@ -1,0 +1,17 @@
+{
+  "dataset_id": "household_expenditure",
+  "vintage_id": "2026-08-05T03-36-50Z",
+  "title": "Average monthly household expenditure by region",
+  "source_url": "https://geostat.ge/media/79283/206_Distribution-of-average-monthly-expenditures-per-household-by-regions.xlsx",
+  "source_page": "https://www.geostat.ge/en/modules/categories/51/households-expenditures",
+  "retrieved_at": "2026-08-05T03:36:50+00:00",
+  "http_status": 200,
+  "byte_size": 63113,
+  "sha256": "527b87d20142ba85bc53e9e396bc0deba4b1c6161529e4e6f04d2ed27024bea0",
+  "row_count": 3510,
+  "period_grain": "annual",
+  "unit_family": "GEL_per_household_month",
+  "note": "Same survey as household income. Reported expenditure usually exceeds reported income, which is a known survey artefact: the difference is not saving or dissaving and must not be presented as one.",
+  "user_agent": "browser User-Agent required; Geostat returns 0 bytes without one",
+  "retrieval_via": "direct fetch from geostat.ge"
+}

@@ -4,25 +4,25 @@
 
 {% macro render_answer(a) %}
 <div class="{{ 'refusal' if a.kind == 'refusal' else ('answer' if a.kind == 'answer' else 'unmatched') }}">
-  <div class="row" style="margin-bottom:8px">
+  <div class="row mb-2">
     {% if a.kind == 'answer' %}<span class="pill pill-pass">answered</span>
     {% elif a.kind == 'refusal' %}<span class="pill pill-warn">refused</span>
     {% else %}<span class="pill pill-idle">no match</span>{% endif %}
     <span class="tag">{{ a.intent }}</span>
   </div>
   <div class="answer-head">{{ a.headline }}</div>
-  {% if a.explanation %}<p style="margin-bottom:12px">{{ a.explanation }}</p>{% endif %}
+  {% if a.explanation %}<p class="mb-4">{{ a.explanation }}</p>{% endif %}
   {% if a.table %}
-  <dl class="kv" style="margin-bottom:12px">
+  <dl class="kv mb-4">
     {% for row in a.table %}<dt>{{ row.label }}</dt><dd>{{ row.value }}</dd>{% endfor %}
   </dl>
   {% endif %}
   {% if a.missing %}
-  <p class="small" style="margin-bottom:12px"><strong>What would be needed:</strong>
+  <p class="small mb-4"><strong>What would be needed:</strong>
     {{ a.missing|join('; ') }}</p>
   {% endif %}
   <div class="formula">{{ a.formula }}</div>
-  {% if a.caveat %}<p class="small faint" style="margin:10px 0 0">{{ a.caveat }}</p>{% endif %}
+  {% if a.caveat %}<p class="small faint mt-2 mb-0">{{ a.caveat }}</p>{% endif %}
   {% for p in a.provenance %}
   {{ m.provenance([
       ('dataset', p.dataset_id),
@@ -59,7 +59,7 @@
 <form class="card" method="get" action="/ask">
   {% if lang != 'en' %}<input type="hidden" name="lang" value="{{ lang }}">{% endif %}
   <div class="toolbar">
-    <div class="field" style="flex:1 1 380px">
+    <div class="field field-wide">
       <label for="q">Question</label>
       <input id="q" type="text" name="q" value="{{ q }}"
              placeholder="What is 1000 GEL from 2015 worth in 2024?">
@@ -79,9 +79,9 @@
   <div class="section-head"><h2>Worked examples</h2>
     <span class="tag">{{ examples|length }} questions, executed live on this page</span></div>
   {% for question, a in examples %}
-  <div class="card" style="margin-bottom:10px">
-    <div class="row" style="margin-bottom:10px">
-      <strong style="font-size:13.5px">{{ question }}</strong>
+  <div class="card mb-3">
+    <div class="row mb-3">
+      <strong class="q-strong">{{ question }}</strong>
       <span class="spacer"></span>
       <a class="btn btn-sm" href="/ask?q={{ question|urlencode }}{{ '&lang=' ~ lang if lang != 'en' else '' }}">Run it</a>
     </div>
@@ -106,7 +106,7 @@
       </table>
     </div>
   </div>
-  <p class="small faint" style="margin-top:10px">
+  <p class="small faint mt-2">
     All of these live in <code>app/metrics.py</code> and are unit-tested against
     hand-computed values. The router in <code>app/analyst.py</code> can call
     these and nothing else, which is what makes an answer here checkable.

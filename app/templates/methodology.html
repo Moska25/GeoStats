@@ -39,7 +39,7 @@
     between them is the point: the mean is dragged upward by high earners, so it
     always sits above the middle earner. If someone asks "what does a normal job
     pay", the median is the closer answer, and neither is take-home.</p>
-    <p style="margin-bottom:0"><strong>No distribution is published.</strong> A
+    <p class="mb-0"><strong>No distribution is published.</strong> A
     mean and a median cannot be inverted into percentiles. The
     <a href="/ask{{ '?lang=' ~ lang if lang != 'en' else '' }}">analyst</a>
     refuses those questions rather than modelling an answer.</p>
@@ -54,14 +54,14 @@
   <div class="card">
     <p>The annual earnings workbook carries this footnote under the title:</p>
     <div class="formula">*Currency - before 1993 -Rouble; 1993 - Coupon; 1994 - Thousand Coupon; since 1995 - Lari.</div>
-    <p style="margin-top:12px">Columns from {{ wage_first }} to 1994 are therefore
+    <p class="mt-3">Columns from {{ wage_first }} to 1994 are therefore
     denominated in three currencies that no longer exist, and only
     {{ gel_era_start }} onward is in Lari. The columns sit adjacent in a single
     sheet row with no visual break. Reading the sheet as one series produces a
     1995 figure of 13.5 next to a 1994 figure of 6,151.6 &mdash; an apparent
     99.8% collapse in wages that is entirely a redenomination.</p>
     <p>GeoStats handles it in three places:</p>
-    <ul class="muted" style="padding-left:20px">
+    <ul class="muted indent-list">
       <li>the parser tags every value with the currency in force in that year
         (<code>adapters.currency_for_year</code>), so the unit is part of the
         composite key;</li>
@@ -71,12 +71,12 @@
       <li>the explorer defaults to {{ gel_era_start }} onward and warns loudly if
         you widen the range past the boundary.</li>
     </ul>
-    <p style="margin-bottom:0">There is no conversion factor in these files, and
+    <p class="mb-0">There is no conversion factor in these files, and
     GeoStats will not invent one. Pre-1995 values are shown in their own currency
     or not at all.</p>
   </div>
 
-  <div class="card card-tight" style="margin-top:14px">
+  <div class="card card-tight mt-4">
     <div class="card-head"><h3>Every published period and its currency</h3>
       <span class="tag">{{ era_rows|length }} periods, from the committed vintage</span></div>
     <div class="table-wrap">
@@ -118,7 +118,7 @@
       </table>
     </div>
   </div>
-  <p class="note" style="margin-top:14px">
+  <p class="note mt-4">
     <strong>CPI base and rebasing.</strong> The price index used throughout is
     Geostat's consumer price index with <strong>2010 annual average = 100</strong>.
     GeoStats derives an annual average by taking the arithmetic mean of the twelve
@@ -155,9 +155,9 @@
   <div class="section-head"><h2><span class="sec-no">5</span>Source catalogue</h2>
     <span class="tag">{{ adapters|length }} datasets · {{ summary.vintages }} vintages · {{ '{:,}'.format(summary.observations) }} observations</span></div>
   {% for a in adapters %}
-  <div class="card" style="margin-bottom:10px">
-    <h3 style="margin-bottom:6px">{{ a.title }}</h3>
-    <p class="small muted" style="margin-bottom:10px">{{ a.note }}</p>
+  <div class="card mb-3">
+    <h3 class="mb-1">{{ a.title }}</h3>
+    <p class="small muted mb-3">{{ a.note }}</p>
     <dl class="kv">
       <dt>File</dt><dd><a href="{{ a.url }}">{{ a.url }}</a></dd>
       <dt>Page</dt><dd><a href="{{ a.source_page }}">{{ a.source_page }}</a></dd>
@@ -171,7 +171,7 @@
 <section class="section" id="limitations">
   <div class="section-head"><h2><span class="sec-no">6</span>Limitations</h2></div>
   <div class="card">
-    <ul class="muted" style="padding-left:20px;margin:0">
+    <ul class="muted indent-list mt-0 mb-0">
       <li>Earnings before 1995 are in Rouble, Coupon or Thousand Coupon and are
         not comparable with anything after; no conversion is applied.</li>
       <li>The CPI series starts in {{ cpi_first }}, so wage years

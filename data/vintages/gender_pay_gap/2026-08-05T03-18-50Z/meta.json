@@ -1,0 +1,17 @@
+{
+  "dataset_id": "gender_pay_gap",
+  "vintage_id": "2026-08-05T03-18-50Z",
+  "title": "Adjusted gender pay gap, hourly and monthly",
+  "source_url": "https://geostat.ge/media/74461/GPG_Eng.xlsx",
+  "source_page": "https://www.geostat.ge/en/modules/categories/39/wages",
+  "retrieved_at": "2026-08-05T03:18:50+00:00",
+  "http_status": 200,
+  "byte_size": 11534,
+  "sha256": "8d09b754a32f71156081bca7db749fba0896f2e9904eb576243e11770f95b7ea",
+  "row_count": 80,
+  "period_grain": "annual",
+  "unit_family": "percent",
+  "note": "Adjusted for observable characteristics, so it is the gap remaining after composition is accounted for, not the raw difference in average pay. The hourly and monthly figures differ because women work fewer paid hours; the monthly gap is the larger of the two every published year.",
+  "user_agent": "browser User-Agent required; Geostat returns 0 bytes without one",
+  "retrieval_via": "direct fetch from geostat.ge"
+}

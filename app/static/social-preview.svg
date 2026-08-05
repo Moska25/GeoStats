@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img"
+     aria-label="GeoStats: revision-aware Georgian labour statistics">
+  <rect width="1200" height="630" fill="#faf7f2"/>
+  <rect x="0" y="0" width="1200" height="8" fill="#1d4ed8"/>
+  <text x="80" y="150" font-family="Georgia, serif" font-size="66" fill="#16181d">GeoStats</text>
+  <text x="80" y="205" font-family="ui-monospace, monospace" font-size="23"
+        letter-spacing="3" fill="#6a645c">REVISION-AWARE GEORGIAN LABOUR STATISTICS</text>
+  <line x1="80" y1="240" x2="1120" y2="240" stroke="#ddd6c9" stroke-width="2"/>
+  <text x="80" y="305" font-family="Georgia, serif" font-size="34" fill="#4d4842">
+    Four currencies in one row of columns.
+  </text>
+  <text x="80" y="352" font-family="Georgia, serif" font-size="34" fill="#4d4842">
+    Every retrieval kept. Every caveat stated.
+  </text>
+  <!-- the naive series, with the redenomination cliff left in -->
+  <polyline points="80,520 200,505 320,470 440,430 560,560 680,545 800,520 920,480 1040,430 1120,400"
+            fill="none" stroke="#b42318" stroke-width="4"/>
+  <polyline points="560,560 680,545 800,520 920,480 1040,430 1120,400"
+            fill="none" stroke="#1d4ed8" stroke-width="5"/>
+  <text x="80" y="590" font-family="ui-monospace, monospace" font-size="19" fill="#6a645c">
+    Source: Geostat, National Statistics Office of Georgia
+  </text>
+</svg>

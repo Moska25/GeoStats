@@ -20,9 +20,16 @@ def cpi_rows():
     return read_rows("cpi_2010_base", latest_vintage("cpi_2010_base"))
 
 
+def _target(fault):
+    """Dataset this fault needs, and the vintage to inject it into."""
+    dataset_id = fault.requires_dataset or DATASET
+    return dataset_id, latest_vintage(dataset_id)
+
+
 @pytest.mark.parametrize("fault", FAULTS, ids=[f.fault_id for f in FAULTS])
 def test_injection_is_caught_and_leaves_the_vintage_intact(fault, vintage_id, cpi_rows):
-    result = inject(DATASET, vintage_id, fault.fault_id, cpi_rows=cpi_rows)
+    dataset_id, target_vintage = _target(fault)
+    result = inject(dataset_id, target_vintage, fault.fault_id, cpi_rows=cpi_rows)
     assert result["caught"], f"{fault.fault_id} was not caught by any contract"
     assert result["caught_by_target"], (
         f"{fault.fault_id} was caught, but not by {fault.targets}"
@@ -33,7 +40,10 @@ def test_injection_is_caught_and_leaves_the_vintage_intact(fault, vintage_id, cp
 
 @pytest.mark.parametrize("fault", FAULTS, ids=[f.fault_id for f in FAULTS])
 def test_defect_report_is_actionable(fault, vintage_id, cpi_rows):
-    report = defect_report(inject(DATASET, vintage_id, fault.fault_id, cpi_rows=cpi_rows))
+    dataset_id, target_vintage = _target(fault)
+    report = defect_report(
+        inject(dataset_id, target_vintage, fault.fault_id, cpi_rows=cpi_rows)
+    )
     assert fault.targets in report
     assert "Immutability check" in report
     assert "vintage untouched                : True" in report

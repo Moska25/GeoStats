@@ -12,11 +12,41 @@
   <a class="btn btn-sm" href="/reliability{{ qs }}">Back to all datasets</a>
   <span class="tag">{{ dataset_id }}</span>
   <span class="tag">{{ history|length }} vintage(s)</span>
-  <form method="post" action="/refresh" style="display:inline">
+  <form method="post" action="/refresh" class="form-inline">
     <input type="hidden" name="dataset_id" value="{{ dataset_id }}">
     <button class="btn btn-sm" type="submit">{{ t('q.refresh') }}</button>
   </form>
 </p>
+
+{% if px_meta %}
+<section class="section" id="second-source">
+  <div class="section-head"><h2>Checked against a second source</h2>
+    <span class="tag">{{ px_meta.row_count }} rows from PX-Web</span></div>
+  <div class="card">
+    <p>Geostat publishes this dataset twice: as the spreadsheet this page is
+      built from, and as a table in the
+      <a href="{{ px_table.browse_url }}">PX-Web database</a>. The two are read
+      by code paths that share nothing &mdash; one parses a workbook grid, the
+      other reads a JSON API &mdash; so the <code>SOURCE_AGREEMENT</code>
+      contract that joins them catches a parser reading the wrong column just
+      as surely as it catches an upstream inconsistency.</p>
+    <dl class="kv">
+      <dt>Table</dt><dd>{{ px_meta.table_title }}</dd>
+      <dt>Captured</dt><dd class="mono">{{ px_meta.captured_at }}</dd>
+      <dt>HTTP</dt><dd>{{ px_meta.http_status }}</dd>
+      <dt>Bytes / rows</dt>
+      <dd class="mono">{{ '{:,}'.format(px_meta.byte_size) }} / {{ px_meta.row_count }}</dd>
+      <dt>sha256</dt><dd class="mono">{{ px_meta.sha256 }}</dd>
+      <dt>Source</dt>
+      <dd><a href="{{ px_table.browse_url }}">{{ px_meta.source_url }}</a></dd>
+    </dl>
+    <p class="footnote">{{ px_meta.note }} The snapshot is committed and
+      read-only, so the comparison runs offline and &ldquo;the two sources
+      agreed&rdquo; is a claim about specific bytes rather than about whatever
+      the API happens to serve today.</p>
+  </div>
+</section>
+{% endif %}
 
 <section class="section" id="contract-sheet">
   <div class="section-head"><h2>Contract results, latest vintage</h2>
@@ -38,7 +68,7 @@
         </div>
         <p class="audit-msg">{{ c.message }}</p>
         {% if c.offender_rows %}
-        <div class="table-wrap" style="margin-top:12px">
+        <div class="table-wrap mt-3">
           <table class="data">
           <caption class="visually-hidden">Rows that failed this contract</caption>
             <thead><tr><th>Breakdown</th><th>{{ t('m.period') }}</th><th>{{ t('m.unit') }}</th>
@@ -57,7 +87,7 @@
           </table>
         </div>
         {% if c.offender_rows|length > 12 %}
-        <p class="small faint" style="margin:8px 0 0">{{ c.offender_rows|length - 12 }} more not shown.</p>
+        <p class="small faint mt-1 mb-0">{{ c.offender_rows|length - 12 }} more not shown.</p>
         {% endif %}
         {% endif %}
         <p class="footnote">Why: {{ c.why }}</p>
@@ -79,7 +109,7 @@
       <div>
         <span class="v-seq">{{ 'Current release' if loop.first else 'Superseded release' }}</span>
         <div class="v-when">{{ v.retrieved_at }}</div>
-        <div style="margin-top:8px">
+        <div class="mt-1">
           <span class="route {{ 'route-archive' if 'Archive' in v.retrieval_via else 'route-direct' }}">{{ v.retrieval_via }}</span>
         </div>
       </div>
@@ -95,7 +125,7 @@
       {% if v.diff %}
         <div class="v-revision">
           <h4>Revisions against {{ v.diff.old_vintage }}</h4>
-          <div class="row" style="margin-bottom:10px">
+          <div class="row mb-3">
             <span class="pill {{ 'pill-idle' if v.diff.bytes_identical else 'pill-info' }}">
               {{ 'bytes identical' if v.diff.bytes_identical else 'bytes differ' }}</span>
           </div>
@@ -106,7 +136,7 @@
             <dt>Preliminary flag changes</dt><dd>{{ v.diff.preliminary_flag_changes|length }}</dd>
           </dl>
           {% if v.diff.changed %}
-          <div class="table-wrap" style="margin-top:12px">
+          <div class="table-wrap mt-3">
             <table class="data">
           <caption class="visually-hidden">Values revised between this vintage and the previous one</caption>
               <thead><tr><th>Series</th><th>{{ t('m.period') }}</th>
@@ -124,13 +154,13 @@
               </tbody>
             </table>
           </div>
-          <p class="small faint" style="margin:8px 0 0">
+          <p class="small faint mt-1 mb-0">
             Read this as: "{{ v.diff.changed[0].period }} changed from
             {{ v.diff.changed[0].old_value }} to {{ v.diff.changed[0].new_value }}
             in the release retrieved on {{ v.retrieved_at[:10] }}."
           </p>
           {% elif v.diff.added %}
-          <p class="small muted" style="margin:10px 0 0">
+          <p class="small muted mt-2 mb-0">
             No previously published value was revised in this release. It added
             {{ v.diff.added|length }} new series-periods
             ({{ v.diff.added[0].period }} onward) and left every earlier figure
@@ -160,7 +190,7 @@
       <dt>Grain</dt><dd>{{ adapter.period_grain }}</dd>
       <dt>Unit family</dt><dd>{{ adapter.unit_family }}</dd>
     </dl>
-    <p class="note" style="margin:16px 0 0">
+    <p class="note mt-5 mb-0">
       <strong>Fetching this needs a browser User-Agent.</strong> Without one
       Geostat answers 200 with a zero-byte body, which a naive ingester records
       as a successful empty release. The adapter sends a Chrome UA and a Referer,

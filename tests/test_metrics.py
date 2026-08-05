@@ -170,3 +170,29 @@ def test_region_index_refuses_a_missing_or_zero_national_figure():
         metrics.region_index(1000.0, None)
     with pytest.raises(metrics.MetricError):
         metrics.region_index(1000.0, 0.0)
+
+
+# -- household and business measures ---------------------------------------
+
+def test_household_balance_is_a_subtraction_and_nothing_more():
+    assert metrics.household_balance(2000.0, 1900.0) == pytest.approx(100.0)
+    assert metrics.household_balance(1000.0, 1100.0) == pytest.approx(-100.0)
+
+
+def test_enterprise_birth_rate_matches_the_published_rate():
+    """Hand-checked against the 2024 national row: 56,259 births against
+    249,236 active enterprises is the 22.57% Geostat publishes."""
+    assert metrics.enterprise_birth_rate(56259, 249236) == pytest.approx(
+        22.5725818100114, abs=1e-9
+    )
+
+
+def test_enterprise_birth_rate_refuses_a_zero_denominator():
+    with pytest.raises(metrics.MetricError):
+        metrics.enterprise_birth_rate(10, 0)
+
+
+def test_share_of_is_a_percentage_of_the_stated_total():
+    assert metrics.share_of(25.0, 200.0) == pytest.approx(12.5)
+    with pytest.raises(metrics.MetricError):
+        metrics.share_of(1.0, 0.0)

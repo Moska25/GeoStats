@@ -1,0 +1,205 @@
+{% extends "_layout.html" %}
+{% import "_macros.html" as m %}
+{% block title %}{{ t('page.households') }}{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <h1>{{ t('page.households') }}</h1>
+  <p class="lede">What households report taking in and what they report spending,
+    per household per month. These come from the Household Incomes and
+    Expenditures Survey, which asks people. That makes them a different kind of
+    number from the earnings series, which counts payroll, and the two are not
+    interchangeable.</p>
+</div>
+
+<form class="card mt-4" method="get" action="/households">
+  {% if lang != 'en' %}<input type="hidden" name="lang" value="{{ lang }}">{% endif %}
+  <div class="toolbar">
+    <div class="field field-year">
+      <label for="year">{{ t('m.year') }}</label>
+      <select id="year" name="year">
+        {% for y in years %}<option value="{{ y }}" {{ 'selected' if y == year }}>{{ y }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="field field-year">
+      <label for="base">Price base</label>
+      <select id="base" name="base">
+        {% for y in base_choices %}<option value="{{ y }}" {{ 'selected' if y == base }}>{{ y }}</option>{% endfor %}
+      </select>
+    </div>
+    <button class="btn btn-primary" type="submit">Apply</button>
+  </div>
+</form>
+
+<p class="note note-warn mt-4">
+  <strong>The difference between these two lines is not a savings rate.</strong>
+  Households under-report income more than they under-report spending in almost
+  every survey of this kind, so the gap between reported income and reported
+  expenditure is mostly a reporting artefact. Presenting it as dissaving, a
+  savings rate, or a household deficit would be reading a survey design as an
+  economic finding. It is shown below because hiding it would be worse, and it
+  is labelled for what it is.
+</p>
+
+{% if summary %}
+<section class="section">
+  <div class="section-head"><h2>What the published figures say</h2>
+    <span class="tag">generated from the plotted series</span></div>
+  <ol class="findings">
+    {% for line in summary %}<li>{{ line }}</li>{% endfor %}
+  </ol>
+</section>
+{% endif %}
+
+<section class="section">
+  <div class="section-head"><h2>Income and expenditure over time</h2>
+    <span class="tag">{{ trend_years[0] if trend_years }}&ndash;{{ trend_years[-1] if trend_years }}</span></div>
+
+  {% call m.exhibit(1, 'Average monthly household income and expenditure, ' ~
+      'nominal and in ' ~ base ~ ' prices',
+      source='Geostat, ' ~ income_adapter.title|lower ~ ' and ' ~
+             expenditure_adapter.title|lower ~ ', deflated by the CPI. ' ~
+             'Vintages ' ~ income_vintage ~ ' and ' ~ expenditure_vintage ~ '.') %}
+  <div class="card">
+    {{ m.chart(trend) }}
+    <p class="footnote">The nominal pair is what the survey reports. The
+      deflated pair is the same figures expressed in {{ base }} prices using the
+      CPI annual average, which is the only adjustment applied anywhere on this
+      page. Both are per household per month, so a change in average household
+      size moves them without anybody's circumstances changing.</p>
+  </div>
+  {% endcall %}
+</section>
+
+{% if paired %}
+<section class="section">
+  <div class="section-head"><h2>Region by region</h2>
+    <span class="tag">{{ year }} · {{ paired|length }} regions</span></div>
+
+  {% if missing %}
+  <p class="note">
+    <strong>Not published for every region.</strong>
+    {{ missing|join(', ') }} {{ 'is' if missing|length == 1 else 'are' }}
+    missing at least one of the two figures for {{ year }}, because the survey
+    sample in those regions was too small to publish. They are drawn as gaps
+    rather than filled in, and no regional average is imputed from the others.
+  </p>
+  {% endif %}
+
+  {% call m.exhibit(2, 'Reported income against reported expenditure by region, ' ~ year,
+      source='Geostat, household incomes and expenditures survey. Per household per month.') %}
+  <div class="card">
+    <div class="dumbbell">
+      <div class="dumbbell-key">
+        <span class="key"><span class="dot dot-left"></span>{{ dumbbell.left_label }}</span>
+        <span class="key"><span class="dot dot-right"></span>{{ dumbbell.right_label }}</span>
+      </div>
+      {% for row in dumbbell.rows %}
+      <div class="dumbbell-row">
+        <span class="dumbbell-label">{{ row.label }}</span>
+        <span class="dumbbell-track">
+          {% if row.left_pct is not none and row.right_pct is not none %}
+          <span class="dumbbell-bar"
+                style="left: {{ [row.left_pct, row.right_pct]|min }}%;
+                       width: {{ (row.right_pct - row.left_pct)|abs }}%"></span>
+          {% endif %}
+          {% if row.left_pct is not none %}
+          <span class="dot dot-left" style="left: {{ row.left_pct }}%"></span>{% endif %}
+          {% if row.right_pct is not none %}
+          <span class="dot dot-right" style="left: {{ row.right_pct }}%"></span>{% endif %}
+        </span>
+        <span class="dumbbell-value">{{ m.num(row.left, 0) }}</span>
+        <span class="dumbbell-value">{{ m.num(row.right, 0) }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endcall %}
+
+  {% call m.exhibit(3, 'Reported income minus reported expenditure by region, ' ~ year,
+      source='Geostat, household incomes and expenditures survey. Subtraction of ' ~
+             'two published figures; no modelling.') %}
+  <div class="card">
+    {% for row in balance.rows %}
+    <div class="diverge-row">
+      <span class="diverge-label">{{ row.label }}</span>
+      <span class="diverge-track">
+        {% if row.value is not none %}
+        <span class="diverge-fill {{ 'is-neg' if row.negative else 'is-pos' }}"
+              style="width: {{ row.pct }}%"></span>
+        {% endif %}
+      </span>
+      <span class="diverge-value">{{ row.text }}</span>
+    </div>
+    {% endfor %}
+    <p class="footnote"><strong>This is not a savings rate.</strong> It is one
+      published number minus another, both self-reported in the same survey. A
+      region on the left of the line is one where households reported spending
+      more than they reported receiving, which is a statement about the survey
+      responses and not about the households' finances.</p>
+  </div>
+  {% endcall %}
+</section>
+
+<section class="section">
+  <div class="section-head"><h2>What the money goes on</h2>
+    <span class="tag">{{ year }} · share of reported spending</span></div>
+
+  {% call m.exhibit(4, 'Composition of reported household expenditure, ' ~ year,
+      source='Geostat, ' ~ expenditure_adapter.title|lower ~ '. Segments are ' ~
+             'shares of each row\'s own total.') %}
+  <div class="card">
+    {% for row in national_composition.rows %}
+    <div class="stack-row">
+      <div class="stack-head">
+        <span><strong>{{ row.label }}</strong></span>
+        <span class="stack-total">{{ row.total_text }} GEL / month</span>
+      </div>
+      <div class="stack-bar">
+        {% for seg in row.segments %}
+        <span class="stack-seg" style="width: {{ seg.pct }}%; background: {{ seg.colour }}"
+              title="{{ seg.name }} {{ '%.1f'|format(seg.pct) }}%"></span>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+    {% for row in composition.rows %}
+    <div class="stack-row">
+      <div class="stack-head">
+        <span>{{ row.label }}</span>
+        <span class="stack-total">{{ row.total_text }} GEL / month</span>
+      </div>
+      <div class="stack-bar">
+        {% for seg in row.segments %}
+        <span class="stack-seg" style="width: {{ seg.pct }}%; background: {{ seg.colour }}"
+              title="{{ seg.name }} {{ '%.1f'|format(seg.pct) }}%"></span>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+    <div class="stack-key">
+      {% for name, colour in composition.colours.items() %}
+      <span class="key"><span class="swatch" style="background: {{ colour }}"></span>{{ name }}</span>
+      {% endfor %}
+    </div>
+    <p class="footnote">Each bar is that row's own consumption total split into
+      the published categories, so the bars compare shape rather than level; the
+      figure on the right carries the level. The categories shown are the
+      published consumption lines only, which is why they do not sum to the
+      total expenditure figure above: that one also includes transfers, saving
+      and lending, and property acquisition.</p>
+  </div>
+  {% endcall %}
+
+  {{ m.provenance([
+      ('datasets', 'household_income, household_expenditure'),
+      ('period', year),
+      ('unit', 'GEL per household per month'),
+      ('vintages', income_vintage ~ ', ' ~ expenditure_vintage),
+      ('source', income_adapter.source_page),
+  ]) }}
+</section>
+{% else %}
+<div class="empty mt-4">No household figures published for {{ year }}.</div>
+{% endif %}
+{% endblock %}

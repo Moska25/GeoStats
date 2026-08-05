@@ -244,3 +244,44 @@ def build_series(
         out.append(row)
         prev_year = year
     return out
+
+
+# --------------------------------------------------------------------------
+# household and business measures
+# --------------------------------------------------------------------------
+
+def household_balance(income: float, expenditure: float) -> float:
+    """Reported income minus reported expenditure, per household per month.
+
+        balance = income - expenditure
+
+    This is a subtraction of two published survey figures and nothing more. It
+    is NOT a savings rate: both sides are self-reported, and households
+    under-report income more than they under-report spending, so the result is
+    dominated by a reporting artefact rather than by household finances. The
+    function exists so that the arithmetic is named, tested and traceable
+    exactly like every other number on the site; the caveat travels with it
+    everywhere it is displayed.
+    """
+    return float(income) - float(expenditure)
+
+
+def enterprise_birth_rate(births: float, active: float) -> float:
+    """Enterprise births as a percentage of active enterprises.
+
+        rate = births / active * 100
+
+    Geostat publishes this rate directly; recomputing it is how the IDENTITY
+    contract checks that the published components and the published rate agree.
+    """
+    active = _require(active, "the count of active enterprises")
+    return float(births) / active * 100.0
+
+
+def share_of(part: float, total: float) -> float:
+    """One component as a percentage of its own total.
+
+        share = part / total * 100
+    """
+    total = _require(total, "the total")
+    return float(part) / total * 100.0

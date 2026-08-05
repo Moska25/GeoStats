@@ -1,0 +1,234 @@
+{% extends "_layout.html" %}
+{% import "_macros.html" as m %}
+{% block title %}{{ t('page.work') }}{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <h1>{{ t('page.work') }}</h1>
+  <p class="lede">What Georgians are paid, how many of them are working, and how
+    far apart those two things move. Pay comes from the enterprise survey and
+    employment from the household survey: two instruments, two populations, and
+    no arithmetic on this page pretends otherwise.</p>
+</div>
+
+{% if summary %}
+<section class="section">
+  <div class="section-head"><h2>What the published figures say</h2>
+    <span class="tag">generated from the plotted series</span></div>
+  <ol class="findings">
+    {% for line in summary %}<li>{{ line }}</li>{% endfor %}
+  </ol>
+  <p class="footnote">Each sentence is a template filled from the same numbers
+    the charts below are drawn from. Refresh a vintage and this prose changes
+    with it; nothing here is a hand-written claim about a particular year.</p>
+</section>
+{% endif %}
+
+{% if breaks %}
+{% for brk in breaks %}
+<p class="note note-warn">
+  <strong>The line breaks between {{ brk.before }} and {{ brk.after }}.</strong>
+  {{ brk.why }} This is the labour-market cousin of the currency trap on the
+  overview: nothing is out of range, no unit moved and no year is missing, so
+  no value check can see it. Every comparison on this page that crosses that
+  boundary says so.
+</p>
+{% endfor %}
+{% endif %}
+
+<section class="section">
+  <div class="section-head"><h2>Pay and unemployment, on separate axes</h2>
+    <span class="tag">{{ shared[0] if shared }}&ndash;{{ shared[-1] if shared }}</span></div>
+
+  <p class="note">
+    <strong>Why these are three charts and not one.</strong> Putting real
+    earnings and the unemployment rate on a single pair of axes means choosing
+    two scales, and whoever chooses them decides whether the two lines appear to
+    move together. Stacking the panels keeps the years aligned vertically while
+    each measure keeps its own scale and its own unit, so the reader compares
+    them without a rendering choice doing the arguing.
+  </p>
+
+  {% call m.exhibit(1, 'Real earnings, unemployment and employment, ' ~
+      (shared[0] if shared else '') ~ ' to ' ~ (shared[-1] if shared else ''),
+      source='Geostat: ' ~ labour_adapter.title|lower ~ ' and the annual ' ~
+             'earnings workbook, deflated by the CPI. Vintage ' ~ labour_vintage ~ '.') %}
+  <div class="card">
+    {% for panel in panels %}
+    <div class="panel">
+      <h3 class="panel-title">{{ panel.label }}</h3>
+      {{ m.chart(panel.chart, show_legend=false) }}
+    </div>
+    {% endfor %}
+    <p class="footnote">Earnings are gross, before personal income tax, and are
+      an average over paid employees. Unemployment and employment rates are from
+      the Labour Force Survey, which counts people where they live rather than
+      where their employer is registered. The step between 2009 and 2010 is the
+      definition break described above: it is a change in who is counted, not in
+      who is working.</p>
+  </div>
+  {% endcall %}
+</section>
+
+<section class="section">
+  <div class="section-head"><h2>The three labour force rates</h2>
+    <span class="tag">{{ lf_years[0] if lf_years }}&ndash;{{ lf_years[-1] if lf_years }}</span></div>
+  {% call m.exhibit(2, 'Unemployment, employment and participation rates',
+      source='Geostat, ' ~ labour_adapter.title|lower ~ '. Vintage ' ~ labour_vintage ~ '.') %}
+  <div class="card">
+    {{ m.chart(force_chart) }}
+    <p class="footnote">These three share one unit and one plausible range, so
+      they belong on one pair of axes. The participation rate is the share of
+      the 15+ population in the labour force; the employment rate is the share
+      in work; unemployment is the share of the labour force, not of the
+      population, which is why it can rise while employment does too.</p>
+  </div>
+  {% endcall %}
+</section>
+
+<section class="section">
+  <div class="section-head"><h2>Quarterly pay by activity</h2>
+    <span class="tag">{{ quarters[0] if quarters }}&ndash;{{ quarters[-1] if quarters }}</span></div>
+
+  <form class="card" method="get" action="/work">
+    {% if lang != 'en' %}<input type="hidden" name="lang" value="{{ lang }}">{% endif %}
+    <div class="toolbar">
+      <div class="field">
+        <label for="activity">Economic activity</label>
+        <select id="activity" name="activity">
+          <option value="">First nine (NACE rev.2)</option>
+          {% for code, label in activity_choices %}
+          <option value="{{ code }}" {{ 'selected' if code == activity }}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button class="btn btn-primary" type="submit">Apply</button>
+    </div>
+  </form>
+
+  {% if seasonality %}
+  <p class="note note-warn">
+    <strong>Q4 is not growth.</strong> Averaged over every complete year in the
+    file, each quarter sits at
+    {% for s in seasonality %}{{ s.quarter }} {{ s.index }}{% if not loop.last %}, {% endif %}{% endfor %}
+    against its own year's mean of 100. The fourth-quarter bonus effect is worth
+    roughly {{ '%.0f'|format(seasonality[-1].index - seasonality[0].index) }}
+    points between Q1 and Q4, so a quarter should be compared with the same
+    quarter a year earlier, never with the one before it.
+  </p>
+  {% endif %}
+
+  {% if small %}
+  {% call m.exhibit(3, 'Average monthly nominal earnings by quarter, NACE rev.2',
+      source='Geostat, ' ~ quarterly_adapter.title|lower ~ '. Vintage ' ~
+             quarterly_vintage ~ '. All panels share one vertical scale.') %}
+  <div class="card">
+    <div class="multiples">
+      {% for panel in small %}
+      <figure class="multiple">
+        <figcaption>
+          <span class="multiple-label">{{ panel.label }}</span>
+          <span class="multiple-value">{{ m.num(panel.latest, 0) }} GEL</span>
+        </figcaption>
+        {{ m.chart(panel.chart, show_legend=false) }}
+      </figure>
+      {% endfor %}
+    </div>
+    <p class="footnote">Every panel is drawn on the same vertical scale, so the
+      panels can be compared by eye. Scaling each panel to its own range would
+      draw a 700 GEL activity and a 3,000 GEL activity as the same line. Only
+      NACE rev.2 is shown: rev.1 covers earlier years under an incompatible
+      classification and the two are never spliced.</p>
+  </div>
+  {% endcall %}
+  {% endif %}
+</section>
+
+{% if gpg.rows %}
+<section class="section">
+  <div class="section-head"><h2>The adjusted gender pay gap</h2>
+    <span class="tag">{{ gpg_year }} · hourly against monthly</span></div>
+
+  {% call m.exhibit(4, 'Adjusted gender pay gap, hourly and monthly, ' ~ gpg_year,
+      source='Geostat, ' ~ gpg_adapter.title|lower ~ '. Adjusted for observable ' ~
+             'characteristics, so this is the gap that remains after composition.') %}
+  <div class="card">
+    <div class="dumbbell">
+      <div class="dumbbell-key">
+        <span class="key"><span class="dot dot-left"></span>{{ gpg.left_label }}</span>
+        <span class="key"><span class="dot dot-right"></span>{{ gpg.right_label }}</span>
+      </div>
+      {% for row in gpg.rows %}
+      <div class="dumbbell-row">
+        <span class="dumbbell-label">{{ row.label }}</span>
+        <span class="dumbbell-track">
+          {% if row.left_pct is not none and row.right_pct is not none %}
+          <span class="dumbbell-bar"
+                style="left: {{ [row.left_pct, row.right_pct]|min }}%;
+                       width: {{ (row.right_pct - row.left_pct)|abs }}%"></span>
+          {% endif %}
+          {% if row.left_pct is not none %}
+          <span class="dot dot-left" style="left: {{ row.left_pct }}%"
+                title="{{ gpg.left_label }} {{ row.left }}%"></span>{% endif %}
+          {% if row.right_pct is not none %}
+          <span class="dot dot-right" style="left: {{ row.right_pct }}%"
+                title="{{ gpg.right_label }} {{ row.right }}%"></span>{% endif %}
+        </span>
+        <span class="dumbbell-value">{{ m.num(row.left, 1) }}%</span>
+        <span class="dumbbell-value">{{ m.num(row.right, 1) }}%</span>
+      </div>
+      {% endfor %}
+    </div>
+    <p class="footnote">The monthly gap exceeds the hourly gap in every
+      published category, because women work fewer paid hours. The hourly figure
+      is therefore the one that isolates the rate of pay; the monthly one also
+      carries the difference in hours worked. Both are already adjusted for
+      observable characteristics, so neither is the raw difference in average
+      pay between women and men.</p>
+  </div>
+  {% endcall %}
+</section>
+{% endif %}
+
+{% if sectors %}
+<section class="section">
+  <div class="section-head"><h2>Pay by economic activity</h2>
+    <span class="tag">{{ sector_year }} · NACE rev.2 only</span></div>
+
+  <p class="note note-warn">
+    <strong>One classification at a time.</strong> Earnings by activity are
+    published under NACE rev.1 to 2019 and NACE rev.2 from 2014. The category
+    boundaries differ, so a series that ran through both would be comparing two
+    definitions of the same word. Only rev.2 is ranked here, and the two are
+    never joined.
+  </p>
+
+  {% call m.exhibit(5, 'Average monthly nominal earnings by activity, ' ~ sector_year,
+      source='Geostat, ' ~ activity_adapter.title|lower ~ '. Gross, before ' ~
+             'personal income tax.') %}
+  <div class="card">
+    <ol class="rank rank-plain">
+      {% for label, value in sectors %}
+      <li>
+        <span class="rank-no">{{ loop.index }}</span>
+        <span class="rank-label">{{ label }}</span>
+        <span class="rank-bar" aria-hidden="true">
+          <span style="width: {{ sector_bars[loop.index0].pct }}%"></span>
+        </span>
+        <span class="rank-value">{{ m.num(value, 0) }}</span>
+      </li>
+      {% endfor %}
+    </ol>
+  </div>
+  {% endcall %}
+
+  {{ m.provenance([
+      ('datasets', 'labour_force, earnings_quarterly, gender_pay_gap, earnings_by_activity'),
+      ('classification', 'NACE rev.2'),
+      ('period', sector_year),
+      ('unit', 'GEL / month, percent'),
+      ('source', activity_adapter.source_page),
+  ]) }}
+</section>
+{% endif %}
+{% endblock %}

@@ -38,7 +38,7 @@
   {% endif %}
 </div>
 
-<p class="note" style="margin-top:14px">
+<p class="note mt-4">
   <strong>What these numbers are.</strong> Geostat earnings are <strong>gross,
   before personal income tax</strong>, and are an average over paid employees
   (earnings fund ÷ average paid employees ÷ months). They are not take-home pay
@@ -46,12 +46,38 @@
   is why the median is shown next to it.
 </p>
 
+{% if findings %}
+<section class="section">
+  <div class="section-head">
+    <h2>Georgia at work and home, in five figures</h2>
+    <span class="tag">each computed from a committed vintage</span>
+  </div>
+  <div class="finding-grid">
+    {% for f in findings %}
+    <article class="finding-card">
+      <h3>{{ f.title }}</h3>
+      <p class="finding-value">{{ f.value }}</p>
+      <p class="finding-unit">{{ f.unit }} · {{ f.period }}</p>
+      <p class="finding-text">{{ f.text }}</p>
+      <p class="finding-foot">
+        <a href="{{ f.href }}{{ '&lang=' ~ lang if lang != 'en' and '?' in f.href }}{{ '?lang=' ~ lang if lang != 'en' and '?' not in f.href }}">See the rows behind this</a>
+        <span class="faint">{{ f.datasets }}</span>
+      </p>
+    </article>
+    {% endfor %}
+  </div>
+  <p class="footnote">Every figure here is computed from a workbook committed in
+    this repository, with its period and unit stated next to it. None is typed
+    in, and each one links to the series it came from.</p>
+</section>
+{% endif %}
+
 <section class="section">
   <div class="section-head">
     <h2>The trap: four currencies in one row of columns</h2>
     <span class="pill pill-accent pill-plain">the reason this project exists</span>
   </div>
-  <p class="muted" style="max-width:76ch">
+  <p class="muted measure-wide">
     The annual earnings workbook carries a footnote:
     <em>&ldquo;Currency &mdash; before 1993 Rouble; 1993 Coupon; 1994 Thousand
     Coupon; since 1995 Lari.&rdquo;</em> The columns are therefore not one series.
@@ -64,23 +90,23 @@
       source='Geostat, average monthly nominal earnings, annual. Vintage ' ~ vintage_id ~ '.') %}
   <div class="compare">
     <div class="card bad">
-      <h3 style="margin-bottom:8px">Naive: every published column as one line</h3>
+      <h3 class="mb-2">Naive: every published column as one line</h3>
       {{ m.chart(naive_chart) }}
-      <p class="small" style="margin-top:10px;color:var(--fail)">
+      <p class="small mt-2 is-fail-text">
         Meaningless. The 1993 spike is 27,950 Coupons sitting next to 13.5 Lari.
       </p>
     </div>
     <div class="card good">
-      <h3 style="margin-bottom:8px">Honest: Lari era only, 1995 onward</h3>
+      <h3 class="mb-2">Honest: Lari era only, 1995 onward</h3>
       {{ m.chart(honest_chart) }}
-      <p class="small" style="margin-top:10px;color:var(--pass)">
+      <p class="small mt-2 is-pass-text">
         One currency, one comparable series. This is the default everywhere else.
       </p>
     </div>
   </div>
   {% endcall %}
 
-  <div style="margin-top:22px">
+  <div class="mt-6">
   {% call m.exhibit(1, 'The handover years, as published', kind='Table',
       source='Geostat, average monthly nominal earnings, annual, breakdown total. ' ~
              'The unit column is the currency in force that year, per the workbook footnote.') %}
@@ -117,7 +143,7 @@
              '2010 average = 100. Real index computed here from the two series.') %}
   <div class="card">
     {{ m.chart(real_chart) }}
-    <p class="note" style="margin:14px 0 0">
+    <p class="note mt-4 mb-0">
       <strong>Why two lines.</strong> The distance between them is inflation.
       Real index = (nominal<sub>t</sub> / nominal<sub>base</sub>) ÷
       (CPI<sub>t</sub> / CPI<sub>base</sub>) × 100, using the Geostat CPI with
@@ -129,6 +155,45 @@
   </div>
   {% endcall %}
 </section>
+
+{% if labour_panels %}
+<section class="section">
+  <div class="section-head"><h2>The labour market beside real wages</h2>
+    <a class="btn btn-sm" href="/work{{ '?lang=' ~ lang if lang != 'en' else '' }}">Open the work page</a></div>
+
+  <p class="note">
+    <strong>Unemployment here is the ILO definition, ages 15 and over.</strong>
+    A person counts as unemployed only if they are out of work, available for
+    work and actively looking for it; someone who has stopped looking is
+    outside the labour force rather than unemployed. It comes from the Labour
+    Force Survey, which asks households where they live — a different
+    instrument and a different population from the earnings series above, which
+    counts payroll at the employer. The two are shown together because they are
+    both about work, not because one explains the other.
+  </p>
+
+  {% call m.exhibit(3, 'Real earnings and the unemployment rate, ' ~
+      labour_years[0] ~ ' to ' ~ labour_years[-1],
+      source='Geostat: annual earnings deflated by the CPI, and ' ~
+             labour_adapter.title|lower ~ '. Vintage ' ~ labour_vintage ~ '.') %}
+  <div class="card">
+    {% for panel in labour_panels %}
+    <div class="panel">
+      <h3 class="panel-title">{{ panel.label }}</h3>
+      {{ m.chart(panel.chart, show_legend=false) }}
+    </div>
+    {% endfor %}
+    {% if labour_break %}
+    <p class="footnote">The step between {{ labour_break.before }} and
+      {{ labour_break.after }} is the {{ labour_break.what }}, not the labour
+      market: Geostat recalculated {{ labour_break.after }} onward and left the
+      earlier years on the old basis, so the two halves count different people.
+      Comparisons across it are flagged wherever this site makes one.</p>
+    {% endif %}
+  </div>
+  {% endcall %}
+</section>
+{% endif %}
 
 <section class="section">
   <div class="section-head"><h2>Provenance at a glance</h2>
@@ -152,7 +217,7 @@
       ('vintage', vintage_id),
       ('source', source_url),
   ]) }}
-  <p class="small faint" style="margin-top:10px">
+  <p class="small faint mt-2">
     Source pages: <a href="{{ source_page }}">{{ source_page }}</a>
   </p>
 </section>

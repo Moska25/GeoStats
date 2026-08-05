@@ -2,22 +2,43 @@
 
 ## Status
 
-Phases 1–7, 10 and 13–16 are built and working. The application ingests eight real Geostat
-workbooks into immutable vintages under `data/vintages/`, validates each vintage
-against nine data contracts, and serves eight pages on port 8013 entirely
-offline from committed data. `earnings_by_region` carries three genuine
-published releases (2020-10-13, 2022-01-29, and the current file) so the vintage
-diff runs against real revisions history; the other seven datasets have one
-vintage each. Nine fault injections each trip their target contract on a copy of
-a vintage, and every run re-verifies that the committed original's sha256 is
-unchanged. The grounded analyst routes fifteen worked examples to a definite
-answer or a specific refusal with no language model involved. **The test suite is
-206 tests and is green** (`./.venv/bin/python -m pytest -q`). Three contract
-checks fail on purpose and are surfaced as failures in the UI: `JOIN` cannot
-match wage years 1995–1999 to a CPI annual average because the CPI series starts
-in 2000. The interface is a light "statistical publication" theme, produced
-entirely by overriding `base.css` variables in `app/static/app.css`; the shared
-`base.css` is a verbatim copy and must stay one.
+**Phases 1–17 are built and working.** The application ingests **twenty** real
+Geostat workbooks into immutable vintages under `data/vintages/`, validates each
+vintage against **eleven** data contracts, and serves **twelve** pages on port
+8013 entirely offline from committed data.
+
+`earnings_by_region` carries three genuine published releases (2020-10-13,
+2022-01-29, and the current file) so the vintage diff runs against real revision
+history. Eleven fault injections each trip their target contract on a copy of a
+vintage, and every run re-verifies that the committed original's sha256 is
+unchanged. The grounded analyst routes twenty worked examples to a definite
+answer or a specific refusal with no language model involved.
+
+**The test suite is 432 tests and is green** (`./.venv/bin/python -m pytest -q`).
+
+Eight contract checks fail on purpose and are surfaced as failures in the UI.
+Every one is named in `contracts.KNOWN_FAILURES` with the reason it is left
+red, and two tests guard that table in both directions: nothing may fail
+without an entry, and no entry may survive its check starting to pass. They
+are the CPI starting five years after the wage series, a regional split Geostat
+stopped publishing for a decade, a pandemic-suspended tourism survey, and three
+lumpy survey categories.
+
+Two things beyond the original plan turned out to matter:
+
+* **A second currency-era trap.** The Labour Force Survey breaks between 2009
+  and 2010 on the ICLS-19 standard: employment falls 1,611 → 1,168 thousand
+  because the definition moved, not the labour market. No unit changed, no year
+  is missing and nothing is out of range, so no value check can see it. It is
+  declared in `adapters.SERIES_BREAKS` and every comparison crossing it says so.
+* **A second source.** Geostat publishes some series twice, as spreadsheets and
+  as PX-Web API tables. `SOURCE_AGREEMENT` joins them and agrees on all 2,029
+  shared cells of the regional labour force series to within the API's own
+  rounding.
+
+The interface is a light "statistical publication" theme, produced entirely by
+overriding `base.css` variables in `app/static/app.css`; the shared `base.css`
+is a verbatim copy and must stay one.
 
 ## How to pick up a task
 
@@ -166,33 +187,36 @@ entirely by overriding `base.css` variables in `app/static/app.css`; the shared
 
 ## Phase 8 — Employment and unemployment
 
-- [ ] **GEO-8.1** Add a labour-force adapter for the employment/unemployment release.
+- [x] **GEO-8.1** Add a labour-force adapter for the employment/unemployment release.
       Files: `app/adapters.py`, `tests/test_adapters.py`
       Done when: `ADAPTERS["labour_force"]` downloads and normalises the
       employment, unemployment and activity-rate series into long format with a
       vintage id, and `test_every_adapter_parses_its_committed_vintage` covers it.
-- [ ] **GEO-8.2** Add a rate-bounds contract for percentage indicators.
+- [x] **GEO-8.2** Add a rate-bounds contract for percentage indicators.
+      *Shipped as unit `percent`, not `rate_pct`: several committed vintages
+      already carried `percent`, and renaming it would have meant re-ingesting
+      them for a cosmetic change. Bounds and behaviour are as specified.*
       Files: `app/contracts.py`, `tests/test_contracts.py`
       Done when: a new unit `rate_pct` is added to `RANGE_BY_UNIT` with bounds
       0–100, and the `RANGE` contract fails on an unemployment rate of 150.
-- [ ] **GEO-8.3** Add a labour-market section to `/` showing the unemployment rate beside real wages.
+- [x] **GEO-8.3** Add a labour-market section to `/` showing the unemployment rate beside real wages.
       Files: `app/main.py`, `app/templates/index.html`
       Done when: the overview renders both series on one chart with the
       unemployment definition (ILO, age 15+) stated in a `.note`.
 
 ## Phase 9 — Quarterly series
 
-- [ ] **GEO-9.1** Extend the period model to quarters.
+- [x] **GEO-9.1** Extend the period model to quarters.
       Files: `app/adapters.py`, `app/contracts.py`, `tests/test_contracts.py`
       Done when: `parse_period_header` produces `2024-Q3`, the `COVERAGE`
       contract detects a missing quarter in a quarterly series, and annual and
       quarterly rows of the same indicator coexist without colliding on the
       composite key.
-- [ ] **GEO-9.2** Add the quarterly earnings adapter.
+- [x] **GEO-9.2** Add the quarterly earnings adapter.
       Files: `app/adapters.py`, `data/vintages/`
       Done when: a real vintage of the quarterly earnings release is committed
       and passes every contract except `JOIN`.
-- [ ] **GEO-9.3** Add a grain selector to `/explorer`.
+- [x] **GEO-9.3** Add a grain selector to `/explorer`.
       Files: `app/main.py`, `app/templates/explorer.html`
       Done when: switching to quarterly redraws the chart from quarterly rows and
       the annual/quarterly choice is preserved in the query string.
@@ -243,11 +267,25 @@ A second design pass over Phase 13, taking the paper theme from "light" to
 
 ## Phase 11 — Release-calendar monitoring
 
-- [ ] **GEO-11.1** Parse the Geostat release calendar into scheduled release dates.
+- [~] **GEO-11.1** Parse the Geostat release calendar into scheduled release dates.
       Files: `app/calendar.py`, `tests/test_calendar.py`
-      Done when: `next_release(dataset_id)` returns a date, or `None` with a
-      reason when the calendar does not cover that dataset.
-- [ ] **GEO-11.2** Flag datasets whose expected release has passed without a new vintage.
+      **Not achievable as specified, and closed as such.** Geostat's calendar at
+      <https://www.geostat.ge/en/calendar> is rendered client-side: the served
+      HTML contains no dates at all, and the obvious JSON endpoints
+      (`/api/calendar`, `/modules/calendar/*`) all return 404. Scraping a
+      JavaScript-rendered page would also break the property that everything
+      runs offline from committed data.
+      What was built instead: `next_release(dataset_id, periods)` infers each
+      dataset's cadence from its own published periods and reports the period
+      the next release should cover, with the basis it was derived from.
+      `scheduled_date(dataset_id)` returns `(None, reason)` for every dataset,
+      which is the honest answer — inventing "expected 15 March" would be
+      exactly the fabrication the rest of this project refuses.
+- [x] **GEO-11.2** Flag datasets whose expected release has passed without a new vintage.
+      *The pill reads "2025 expected, newest published is 2024" rather than
+      carrying a date, because GEO-11.1 established there is no date to carry.
+      Nine datasets are currently flagged, including every detailed earnings
+      breakdown — Geostat publishes those a year behind the headline figure.*
       Files: `app/main.py`, `app/templates/reliability.html`
       Done when: a reliability card shows a `pill-warn` reading "release expected
       <date>, latest vintage <date>" when the newest vintage predates the
@@ -255,12 +293,22 @@ A second design pass over Phase 13, taking the paper theme from "light" to
 
 ## Phase 12 — PX-Web API adapter
 
-- [ ] **GEO-12.1** Add a PX-Web adapter alongside the spreadsheet adapters.
+- [x] **GEO-12.1** Add a PX-Web adapter alongside the spreadsheet adapters.
+      *Lives in `app/pxweb.py` rather than in `ADAPTERS`, because it is a
+      cross-check rather than a dataset: it produces no vintage and no page
+      reads from it. The API reading is frozen to `data/pxweb/` with its own
+      checksum so the comparison runs offline. Two quirks of this installation
+      are documented in the module: `json-stat2` 404s where `json` works, and a
+      query carrying a `selection` 404s where an empty one returns the table.*
       Files: `app/adapters.py`, `tests/test_adapters.py`
       Done when: an adapter fetches the same indicator through the PX-Web JSON
       API, normalises it into the identical long format, and passes every
       contract.
-- [ ] **GEO-12.2** Cross-check the API and spreadsheet values for the same indicator.
+- [x] **GEO-12.2** Cross-check the API and spreadsheet values for the same indicator.
+      *Tolerance is 0.05, not 0.01: PX-Web rounds to one decimal place and the
+      spreadsheets carry full precision, so half the last published digit is
+      the largest gap rounding alone can produce. Derived, not tuned — the
+      worst observed disagreement across 2,029 shared cells is exactly 0.05.*
       Files: `app/contracts.py`, `tests/test_contracts.py`
       Done when: a `SOURCE_AGREEMENT` contract fails if any period differs
       between the two sources by more than 0.01, and its message names the
@@ -409,25 +457,27 @@ to unblock a task: if the file cannot be found, mark the task blocked and say so
       unnamed regional question still leads with top and bottom, and the refusal
       for *median by region* still fires because the median series carries no
       regional breakdown. No new data needed; `earnings_by_region` is committed.
-- [ ] **GEO-17.2** Add a `?format=csv` download to the explorer and the regions page.
+- [x] **GEO-17.2** Add a `?format=csv` download to the explorer and the regions page.
       Files: `app/main.py`, `tests/test_web.py`
       Done when: the response is `text/csv` with a `Content-Disposition` filename
       carrying the dataset and vintage id, the header row names the unit, and the
       rows equal the ones rendered in the HTML table for the same query string.
       A statistics platform that cannot export is a screenshot.
-- [ ] **GEO-17.3** Add the labour-force adapter (supersedes GEO-8.1).
+- [x] **GEO-17.3** Add the labour-force adapter (supersedes GEO-8.1).
       Files: `app/adapters.py`, `data/vintages/labour_force/`, `tests/test_adapters.py`
       Done when: the employment, unemployment and activity-rate series parse into
       long format from a committed vintage, `test_every_adapter_parses_its_committed_vintage`
       covers `labour_force`, and the ILO age-15+ definition is recorded in the
       adapter `note` so the UI can print it.
-- [ ] **GEO-17.4** Add the rate-bounds contract for percentage indicators (supersedes GEO-8.2).
+- [x] **GEO-17.4** Add the rate-bounds contract for percentage indicators (supersedes GEO-8.2).
+      *Unit is `percent` rather than `rate_pct` — see GEO-8.2. The matching
+      fault is `impossible_rate`, which pushes a rate to 150%.*
       Files: `app/contracts.py`, `tests/test_contracts.py`
       Done when: `RANGE_BY_UNIT` gains `rate_pct` bounded 0 to 100, the `RANGE`
       contract fails on an unemployment rate of 150 with the offending row named,
       and a matching fault exists in `app/faults.py` so the lab still has one
       injection per contract.
-- [ ] **GEO-17.5** Extend the period model to quarters (supersedes GEO-9.1).
+- [x] **GEO-17.5** Extend the period model to quarters (supersedes GEO-9.1).
       Files: `app/adapters.py`, `app/contracts.py`, `tests/test_contracts.py`
       Done when: `parse_period_header` produces `2024-Q3`, `COVERAGE` detects a
       missing quarter in a quarterly series, and annual and quarterly rows of the

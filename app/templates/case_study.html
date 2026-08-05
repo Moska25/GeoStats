@@ -1,0 +1,337 @@
+{% extends "_layout.html" %}
+{% import "_macros.html" as m %}
+{% block title %}{{ t('page.case_study') }}{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <h1>{{ t('page.case_study') }}</h1>
+  <p class="lede">How this was built and why it is built that way. Every number
+    on this page is read from the live index rather than typed in, so if a
+    dataset is added or a contract starts failing, this account changes with it.
+    A page claiming a system works should not be able to go stale.</p>
+</div>
+
+<nav class="contents" aria-label="Contents">
+  <p class="contents-head">Contents</p>
+  <ol>
+    <li><a href="#problem">The problem, and the failure mode it produces</a></li>
+    <li><a href="#architecture">Immutable vintages</a></li>
+    <li><a href="#adapters">Adapters and contracts</a></li>
+    <li><a href="#revision">A real revision, caught by diffing</a></li>
+    <li><a href="#faults">Fault injection, run live</a></li>
+    <li><a href="#analyst">The analyst, and what it refuses</a></li>
+    <li><a href="#evidence">Tests and accessibility</a></li>
+    <li><a href="#demo">A five-minute demo</a></li>
+  </ol>
+</nav>
+
+<section class="section" id="problem">
+  <div class="section-head"><h2><span class="sec-no">1</span> The problem</h2></div>
+  <p class="note">
+    Official statistics are published, revised, corrected and reclassified. A
+    platform that overwrites yesterday's file is lying to its users: it can no
+    longer say what it knew, when it knew it, or whether a number moved.
+  </p>
+  <p>The Georgian earnings series makes the second half of the problem concrete.
+    Its annual workbook puts 1992, 1993, 1994 and 1995 in adjacent columns, and
+    a footnote at the bottom of the sheet explains that those columns are
+    denominated in Roubles, Coupons, Thousand Coupons and Lari. Read the row as
+    one series and 1995 looks like a 99.8% collapse in wages. It was a
+    redenomination. Nothing about the individual numbers is wrong; only reading
+    them as one series is.</p>
+  <p>That shape of defect - every value plausible, the relationship between them
+    meaningless - turns out to be the general case, and this platform is built
+    around catching it:</p>
+  <ul class="tight">
+    <li><strong>Unit changes.</strong> Four currencies in one row of columns.</li>
+    {% if primary_break %}
+    <li><strong>Definition changes.</strong> The labour force series breaks
+      between {{ primary_break.before }} and {{ primary_break.after }} on the
+      {{ primary_break.what }}: no unit moved, no year is missing, nothing is
+      out of range, and the two halves count different people.</li>
+    {% endif %}
+    <li><strong>Classification changes.</strong> Earnings by activity exist
+      under NACE rev.1 and rev.2 with overlapping years and different category
+      boundaries. They are kept apart and never spliced.</li>
+    <li><strong>Spelling changes.</strong> Six workbooks spell Adjara four ways.
+      Joining on the printed label would produce four regions where there is
+      one.</li>
+  </ul>
+</section>
+
+<section class="section" id="architecture">
+  <div class="section-head"><h2><span class="sec-no">2</span> Immutable vintages</h2>
+    <span class="tag">{{ stats.vintages }} vintages · {{ '{:,}'.format(stats.observations) }} observations</span></div>
+
+  <div class="grid grid-4 keyfigures">
+    <div class="metric">
+      <div class="metric-label">Datasets</div>
+      <div class="metric-value">{{ stats.datasets }}</div>
+      <div class="metric-sub">official Geostat workbooks</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Vintages</div>
+      <div class="metric-value">{{ stats.vintages }}</div>
+      <div class="metric-sub">never overwritten</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Observations</div>
+      <div class="metric-value">{{ '{:,}'.format(stats.observations) }}</div>
+      <div class="metric-sub">one long format, one key</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Contract checks</div>
+      <div class="metric-value {{ 'is-warn' if totals.failed }}">{{ totals.passed }}/{{ totals.total }}</div>
+      <div class="metric-sub">on latest vintages · {{ totals.failed }} red on purpose</div>
+    </div>
+  </div>
+
+  <p>Each retrieval is written to
+    <code>data/vintages/&lt;dataset&gt;/&lt;UTC timestamp&gt;/</code> holding the
+    raw bytes, a <code>meta.json</code> with source URL, sha256, byte size and
+    HTTP status, and the normalised rows. The files are chmod 0444 and the
+    writer refuses a path that already exists. The sqlite database every page
+    reads from is a <em>derived index</em>, rebuilt from those files on every
+    start; if it ever disagrees with a vintage, the vintage wins.</p>
+
+  <p class="note">
+    <strong>Why the raw bytes and not just the parsed rows.</strong> A parser
+    changes. When it does, the only way to know whether a number moved because
+    Geostat revised it or because the parsing improved is to re-parse the
+    original bytes. Keeping the rows alone would make those two causes
+    indistinguishable forever.
+  </p>
+
+  <p>The datasets ship at three period grains, which the schema carries rather
+    than assumes:</p>
+  <ul class="tight">
+    {% for grain, ids in grains.items() %}
+    <li><strong>{{ grain }}</strong> &mdash; {{ ids|length }} dataset{{ '' if ids|length == 1 else 's' }}:
+      <span class="faint mono">{{ ids|join(', ') }}</span></li>
+    {% endfor %}
+  </ul>
+</section>
+
+<section class="section" id="adapters">
+  <div class="section-head"><h2><span class="sec-no">3</span> Adapters and contracts</h2>
+    <span class="tag">{{ datasets|length }} adapters · {{ contracts|length }} contracts</span></div>
+
+  <p>One adapter per dataset, each implementing the same four stages:
+    <code>discover</code>, <code>download</code>, <code>parse</code>,
+    <code>normalise</code>. Everything lands in one long format keyed by
+    <code>dataset_id, indicator_code, breakdown_code, period, unit,
+    vintage_id</code>. Places resolve through a registry of
+    {{ region_count }} rankable regions, so a region code from the household
+    survey is the same string as the one from business demography.</p>
+
+  <div class="card card-tight">
+    <div class="table-wrap">
+      <table class="data">
+        <caption class="visually-hidden">Data contracts and why each exists</caption>
+        <thead><tr><th>Contract</th><th>Checks</th><th>Why it exists</th></tr></thead>
+        <tbody>
+          {% for c in contracts %}
+          <tr>
+            <td class="mono">{{ c.code }}</td>
+            <td class="wrap">{{ c.title }}</td>
+            <td class="wrap faint">{{ c.why }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% if px_snapshots %}
+  <h3 class="mt-6">A second source</h3>
+  <p>One check does not read the vintage at all. Geostat publishes some series
+    twice &mdash; as the spreadsheets this project ingests, and as tables in its
+    <a href="https://pc-axis.geostat.ge/PXWeb/">PX-Web database</a> &mdash; and
+    <code>SOURCE_AGREEMENT</code> joins the two. They are reached by code paths
+    that share nothing, so a parser that took the wrong column would pass every
+    other check in the table above and fail this one immediately.</p>
+  <div class="card card-tight">
+    <div class="table-wrap">
+      <table class="data">
+        <caption class="visually-hidden">Datasets with a committed second-source snapshot</caption>
+        <thead><tr><th>Dataset</th><th>PX-Web table</th><th class="num">Rows</th><th>Captured</th></tr></thead>
+        <tbody>
+          {% for dataset_id, meta in px_snapshots.items() %}
+          <tr>
+            <td class="mono">{{ dataset_id }}</td>
+            <td class="wrap">{{ meta.table_title }}</td>
+            <td class="num">{{ meta.row_count }}</td>
+            <td class="mono">{{ meta.captured_at }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <p class="footnote">The API reading is frozen to disk with its own checksum,
+    exactly as a spreadsheet retrieval is, so the comparison runs offline and
+    the test suite stays deterministic. The tolerance is half the last digit
+    PX-Web publishes: it rounds to one decimal place and the spreadsheets carry
+    full precision, so anything larger is a real difference between the two
+    publications rather than an artefact of rounding.</p>
+  {% endif %}
+
+  {% if red %}
+  <h3 class="mt-6">The {{ red|length }} checks that are red, and why</h3>
+  <p>A red check here is a limitation of the published statistics, not a bug to
+    be tuned away. The test suite asserts that nothing fails without an entry
+    explaining it, and that every explanation still corresponds to a check that
+    actually fails &mdash; so this table cannot rot in either direction.</p>
+  <div class="card card-tight">
+    <div class="table-wrap">
+      <table class="data">
+        <caption class="visually-hidden">Failing contract checks with their explanations</caption>
+        <thead><tr><th>Dataset</th><th>Check</th><th>Why it is left failing</th></tr></thead>
+        <tbody>
+          {% for row in red %}
+          <tr>
+            <td class="mono">{{ row.dataset_id }}</td>
+            <td class="mono">{{ row.code }}</td>
+            <td class="wrap">{{ row.explained or 'UNDOCUMENTED — this is a regression.' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+</section>
+
+{% if revision %}
+<section class="section" id="revision">
+  <div class="section-head"><h2><span class="sec-no">4</span> A real revision</h2>
+    <span class="tag">{{ revision.dataset_id }}</span></div>
+  <p>Two earlier releases of the regional earnings file were recovered from the
+    Internet Archive so the vintage log starts before this project did. Their
+    <code>meta.json</code> records that retrieval route honestly. Diffing them
+    against the current file gives a finding rather than a demo:</p>
+  <div class="card">
+    <dl class="kv">
+      <dt>Comparing</dt><dd class="mono">{{ revision.diff.old_vintage }} → {{ revision.diff.new_vintage }}</dd>
+      <dt>Bytes identical</dt><dd>{{ 'yes' if revision.diff.bytes_identical else 'no' }}</dd>
+      <dt>Series added</dt><dd>{{ revision.diff.added|length }}</dd>
+      <dt>Values revised</dt><dd>{{ revision.diff.changed|length }}</dd>
+      <dt>Series removed</dt><dd>{{ revision.diff.removed|length }}</dd>
+      <dt>Preliminary flags changed</dt><dd>{{ revision.diff.preliminary_flag_changes|length }}</dd>
+    </dl>
+    <p class="footnote">Geostat added years without revising any earlier figure.
+      That is a finding, not an absence of one: it says the published history is
+      stable, and a platform with no vintages could not have told you either
+      way.</p>
+  </div>
+</section>
+{% endif %}
+
+<section class="section" id="faults">
+  <div class="section-head"><h2><span class="sec-no">5</span> Fault injection, run live</h2>
+    <span class="tag">{{ faults|length }} faults</span></div>
+  <p>A contract you have never seen fail is not a check. Every contract has a
+    matching fault that targets it, applied to a <em>copy</em> of a committed
+    vintage. The run below happened when this page was rendered:</p>
+
+  <div class="card">
+    <dl class="kv">
+      <dt>Fault</dt><dd>{{ demo_fault.name }} <span class="faint">({{ demo_fault.fault_id }})</span></dd>
+      <dt>Imitates</dt><dd class="wrap">{{ demo_fault.real_world }}</dd>
+      <dt>What it did</dt><dd class="wrap">{{ demo.description }}</dd>
+      <dt>Caught by</dt>
+      <dd>{{ m.pill(not demo.caught) }} {{ demo.caught_by|join(', ') if demo.caught_by else 'nothing' }}</dd>
+      <dt>Original checksum before</dt><dd class="mono">{{ demo.original_sha256[:32] }}…</dd>
+      <dt>Original checksum after</dt><dd class="mono">{{ demo.original_sha256_after_run[:32] }}…</dd>
+      <dt>Vintage untouched</dt>
+      <dd><span class="pill {{ 'pill-pass' if demo.vintage_unchanged else 'pill-fail' }}">{{ demo.vintage_unchanged }}</span></dd>
+    </dl>
+    <p class="footnote">The two checksums are printed because the claim that
+      injection cannot touch a committed vintage is worth verifying on every
+      single run rather than asserting in a README. Try the rest from the
+      <a href="/lab{{ qs }}">fault lab</a>.</p>
+  </div>
+</section>
+
+<section class="section" id="analyst">
+  <div class="section-head"><h2><span class="sec-no">6</span> The analyst, and what it refuses</h2>
+    <span class="tag">no LLM</span></div>
+  <p>The analyst is a regex intent router over a closed set of approved metric
+    functions. That is a deliberate downgrade in flexibility for a large upgrade
+    in checkability: every answer names the function and formula that produced
+    it, and anything outside the set gets no answer rather than a plausible
+    one.</p>
+
+  <div class="card">
+    <p class="ask-q">{{ answered.question }}</p>
+    {% if answered.answer %}<p class="ask-a">{{ answered.answer }}</p>{% endif %}
+    {% if answered.formula %}<p class="footnote mono">{{ answered.formula }}</p>{% endif %}
+  </div>
+
+  <div class="card mt-3">
+    <p class="ask-q">{{ refused.question }}</p>
+    <p class="ask-a"><span class="pill pill-fail">refused</span> {{ refused.refusal or refused.answer }}</p>
+    <p class="footnote">A percentile cannot be reconstructed from a mean and a
+      median. The honest response is no answer plus the reason, and a refusal
+      here never attaches a source or a number &mdash; which is itself a
+      test.</p>
+  </div>
+</section>
+
+<section class="section" id="evidence">
+  <div class="section-head"><h2><span class="sec-no">7</span> Tests and accessibility</h2></div>
+  <ul class="tight">
+    <li>Parser behaviour pinned against the committed workbooks: confirmed
+      published values, gap markers preserved rather than zeroed, a decimal
+      comma refused rather than guessed.</li>
+    <li>Every contract passes on clean data and fails on the fault that targets
+      it, naming the offending rows.</li>
+    <li>Region aliases, geography levels, quarterly parsing and quarter gaps,
+      unit bounds, published identities, and composite-key uniqueness.</li>
+    <li>Batch refresh with one failing source, an empty body, unchanged bytes,
+      and an unexpected exception &mdash; none of which may cancel the rest.</li>
+    <li>Vintage immutability: fault injection cannot change a committed
+      vintage's checksum, and committed files are read-only on disk.</li>
+    <li>Every route returns 200 in both languages and carries its caveats; every
+      page holds <code>scrollWidth === clientWidth</code> at 375px.</li>
+  </ul>
+  <p class="footnote">Deliberately not covered: the live network path (adapters'
+    <code>download</code> is monkeypatched so the suite runs offline and
+    deterministically), browser rendering, and the exact SVG geometry of the
+    charts.</p>
+</section>
+
+<section class="section" id="demo">
+  <div class="section-head"><h2><span class="sec-no">8</span> A five-minute demo</h2></div>
+  <ol class="tight">
+    <li><a href="/{{ qs }}">Overview</a> &mdash; the five figures, then the trap:
+      the same published columns plotted naively and honestly side by side.</li>
+    <li><a href="/work{{ qs }}">Work</a> &mdash; real pay against unemployment on
+      separate axes, and the 2009/2010 definition break that no value check can
+      see.</li>
+    <li><a href="/atlas?metric=earnings{{ '&lang=' ~ lang if lang != 'en' }}">Atlas</a>
+      &mdash; six workbooks joined on one region registry, as a cartogram rather
+      than a map.</li>
+    <li><a href="/reliability/earnings_by_region{{ qs }}">Reliability</a> &mdash;
+      three genuine releases of one series, each with its own checksum, and the
+      diff between them.</li>
+    <li><a href="/lab?fault_id=mislabel_era{{ '&lang=' ~ lang if lang != 'en' }}">Lab</a>
+      &mdash; break the currency era on a copy and watch the contract catch it,
+      with the original's checksum proving it never moved.</li>
+    <li><a href="/ask{{ qs }}">Ask</a> &mdash; skip to the refusals. They are the
+      interesting ones.</li>
+  </ol>
+
+  <p class="note">
+    <strong>In one paragraph.</strong> A revision-aware platform over
+    {{ stats.datasets }} official Geostat workbooks: {{ stats.vintages }}
+    immutable vintages, {{ '{:,}'.format(stats.observations) }} observations,
+    {{ contracts|length }} declarative data contracts each with a matching fault
+    injection, a canonical geography registry that lets six separately-published
+    regional files join, and a deterministic analyst that refuses questions the
+    published aggregates cannot support. Python, FastAPI, Jinja, SQLite as a
+    rebuildable read index, and hand-rolled inline SVG. No chart library, no
+    JavaScript framework, no LLM in the data path.
+  </p>
+</section>
+{% endblock %}

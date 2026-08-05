@@ -32,7 +32,7 @@
   </div>
 </form>
 
-<div class="grid grid-3" style="margin-top:14px">
+<div class="grid grid-3 mt-4">
   <div class="metric">
     <div class="metric-label">{{ t('m.purchasing_power') }} preserved</div>
     <div class="metric-value is-accent">{{ m.num(equivalent) }}</div>
@@ -50,8 +50,8 @@
   </div>
 </div>
 
-<div class="card" style="margin-top:14px">
-  <h2 style="margin-bottom:10px">The nominal-to-real breakdown</h2>
+<div class="card mt-4">
+  <h2 class="mb-3">The nominal-to-real breakdown</h2>
   <div class="formula">equivalent = amount × (CPI_{{ year_to }} / CPI_{{ year_from }})
            = {{ '%.2f'|format(amount) }} × ({{ '%.4f'|format(cpi_hi) }} / {{ '%.4f'|format(cpi_lo) }})
            = {{ '%.2f'|format(equivalent) }} GEL
@@ -59,7 +59,7 @@
 real     = amount × (CPI_{{ year_from }} / CPI_{{ year_to }})
            = {{ '%.2f'|format(amount) }} × ({{ '%.4f'|format(cpi_lo) }} / {{ '%.4f'|format(cpi_hi) }})
            = {{ '%.2f'|format(real_today) }} GEL in {{ year_from }} prices</div>
-  <p class="note" style="margin:14px 0 0">
+  <p class="note mt-4 mb-0">
     <strong>These two are inverses.</strong> Deflating {{ year_to }} money into
     {{ year_from }} prices and inflating {{ year_from }} money into {{ year_to }}
     prices use the same ratio the other way up; the test suite asserts the
@@ -102,7 +102,7 @@ real     = amount × (CPI_{{ year_from }} / CPI_{{ year_to }})
       {% if is_preliminary %}The {{ compare_year }} mean is preliminary.{% endif %}</p>
   </div>
   {% endcall %}
-  <div class="card" style="margin-top:14px">
+  <div class="card mt-4">
     <dl class="kv">
       <dt>Published mean, {{ compare_year }}</dt>
       <dd>{{ m.num(mean_value) }} GEL{% if is_preliminary %} <span class="pill pill-warn">{{ t('q.preliminary') }}</span>{% endif %}</dd>
@@ -115,7 +115,7 @@ real     = amount × (CPI_{{ year_from }} / CPI_{{ year_to }})
       <dd>{% if vs_median %}{{ '%.1f'|format(vs_median) }}%{% else %}n/a{% endif %}</dd>
       {% endif %}
     </dl>
-    <p class="note note-warn" style="margin:16px 0 0">
+    <p class="note note-warn mt-5 mb-0">
       <strong>Read this carefully.</strong> Both published figures are
       <strong>gross, before personal income tax</strong>, and the mean is an
       average over paid employees, not a typical salary. Being above the mean
@@ -130,7 +130,7 @@ real     = amount × (CPI_{{ year_from }} / CPI_{{ year_to }})
 <section class="section">
   <div class="section-head"><h2>Year by year</h2></div>
   <div class="card">{{ m.chart(chart) }}</div>
-  <div class="card card-tight" style="margin-top:14px">
+  <div class="card card-tight mt-4">
     <div class="table-wrap">
       <table class="data">
           <caption class="visually-hidden">Consumer price index and the equivalent of the entered amount, year by year</caption>

@@ -1,0 +1,17 @@
+{
+  "dataset_id": "labour_force",
+  "vintage_id": "2026-08-05T03-44-48Z",
+  "title": "Labour force indicators, annual",
+  "source_url": "https://geostat.ge/media/78735/01-Labour-Force-Indicators.xlsx",
+  "source_page": "https://www.geostat.ge/en/modules/categories/683/dasakmeba-umushevroba",
+  "retrieved_at": "2026-08-05T03:44:48+00:00",
+  "http_status": 200,
+  "byte_size": 16390,
+  "sha256": "9a55e31cc79f7b7a68cf10f99b0c21055a0397ccd4d604210e45bc2b3c347214",
+  "row_count": 308,
+  "period_grain": "annual",
+  "unit_family": "thousand_persons",
+  "note": "Labour Force Survey, 1998 onward. Head counts and rates share one sheet, so the unit is taken from each row's own label. The series breaks between 2009 and 2010: Geostat adopted the ICLS-19 standard in 2020, which puts subsistence farmers outside employment, and recalculated 2010 onward while leaving 1998-2009 on the old basis. Employment falls by 443 thousand across that boundary for definitional reasons.",
+  "user_agent": "browser User-Agent required; Geostat returns 0 bytes without one",
+  "retrieval_via": "direct fetch from geostat.ge"
+}

@@ -1,0 +1,17 @@
+{
+  "dataset_id": "business_demography",
+  "vintage_id": "2026-08-05T03-18-49Z",
+  "title": "Enterprise births, deaths and employment by region",
+  "source_url": "https://geostat.ge/media/75003/Main-results.xlsx",
+  "source_page": "https://www.geostat.ge/en/modules/categories/69/business-demography",
+  "retrieved_at": "2026-08-05T03:18:49+00:00",
+  "http_status": 200,
+  "byte_size": 137238,
+  "sha256": "a1f3caf275ff51c79687c8e777f0d47ca2dad853b929d1472615b081fa8e8021",
+  "row_count": 924,
+  "period_grain": "annual",
+  "unit_family": "enterprises",
+  "note": "Registrations, not economic activity: an individual entrepreneur registering counts the same as a factory opening. Enterprises are attributed to their registered address, which concentrates them in Tbilisi for the same reason the earnings series does.",
+  "user_agent": "browser User-Agent required; Geostat returns 0 bytes without one",
+  "retrieval_via": "direct fetch from geostat.ge"
+}

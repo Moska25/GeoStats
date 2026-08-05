@@ -198,3 +198,126 @@ def test_median_by_region_is_still_refused(conn):
     answer = ask(conn, "What is the median salary by region?")
     assert answer.kind == "refusal"
     assert answer.provenance == []
+
+
+# -- the labour, household, population and business intents ----------------
+
+def test_unemployment_rate_is_read_not_rederived(conn):
+    """Geostat publishes the rate. Recomputing it from the counts would give a
+    second number that disagrees with the official one in the fourth decimal."""
+    answer = ask(conn, "What was the unemployment rate in 2024?")
+    assert answer.kind == "answer"
+    assert answer.intent == "labour_force_indicator"
+    assert "13.9" in answer.headline
+    assert "read not derived" in answer.formula or "published directly" in answer.formula
+
+
+def test_unemployment_answer_warns_about_the_definition_break(conn):
+    answer = ask(conn, "What was the unemployment rate in 2024?")
+    assert "2009" in answer.caveat and "2010" in answer.caveat
+    assert "ICLS-19" in answer.caveat
+
+
+def test_a_count_question_gets_a_count_not_a_rate(conn):
+    """'How many people were unemployed' and 'what is the unemployment rate'
+    are different questions; answering one with the other reads as correct."""
+    count = ask(conn, "How many people were unemployed in 2020?")
+    rate = ask(conn, "What was the unemployment rate in 2020?")
+    assert "thousand" in count.headline
+    assert "%" in rate.headline
+    assert count.headline != rate.headline
+
+
+def test_employment_count_is_not_answered_with_population(conn):
+    answer = ask(conn, "How many people were employed in 2024?")
+    assert answer.intent == "labour_force_indicator"
+    assert "1,402" in answer.headline
+
+
+def test_household_answer_refuses_to_call_the_gap_a_savings_rate(conn):
+    answer = ask(conn, "What does a household spend per month in 2024?")
+    assert answer.kind == "answer"
+    assert answer.intent == "household_balance"
+    assert "NOT a savings rate" in answer.caveat
+    assert "reporting artefact" in answer.caveat
+
+
+def test_household_answer_cites_both_source_datasets(conn):
+    answer = ask(conn, "What is household income and expenditure in 2024?")
+    datasets = {p["dataset_id"] for p in answer.provenance}
+    assert datasets == {"household_income", "household_expenditure"}
+
+
+def test_population_answer_warns_the_series_was_rebased(conn):
+    answer = ask(conn, "What is Georgia's population?")
+    assert answer.kind == "answer"
+    assert "2024 census" in answer.caveat
+
+
+def test_business_answer_says_registrations_not_activity(conn):
+    answer = ask(conn, "How many enterprises were born in 2023?")
+    assert answer.kind == "answer"
+    assert "registrations, not economic activity" in answer.explanation
+    assert "registered address" in answer.caveat
+
+
+def test_a_forecast_about_unemployment_is_still_refused(conn):
+    """Refusals are checked before intents, so a new intent must not create a
+    back door around them."""
+    answer = ask(conn, "What will unemployment be in 2030?")
+    assert answer.is_refusal
+
+
+def test_every_new_intent_carries_provenance(conn):
+    for question in [
+        "What was the unemployment rate in 2024?",
+        "What does a household spend per month in 2024?",
+        "What is Georgia's population?",
+        "How many enterprises were born in 2023?",
+    ]:
+        answer = ask(conn, question)
+        assert answer.kind == "answer", question
+        assert answer.provenance, f"{question} answered with no provenance"
+        for prov in answer.provenance:
+            assert prov["vintage_id"]
+            assert prov["source_url"].startswith("https://geostat.ge/")
+            assert prov["unit"]
+
+
+def test_direct_reads_are_listed_apart_from_derived_metrics():
+    """A published figure read straight off the sheet has no formula, and
+    claiming one would invent a derivation that never happens."""
+    from app.analyst import APPROVED_METRICS, DIRECT_READS
+
+    metric_names = {name for name, _f in APPROVED_METRICS}
+    read_names = {name for name, _d in DIRECT_READS}
+    assert not (metric_names & read_names)
+    assert "labour_force_indicator" in read_names
+
+
+# -- tourism ---------------------------------------------------------------
+
+def test_tourism_question_reports_domestic_and_inbound_separately(conn):
+    """Adding the two together would double-count nothing useful: they are
+    different populations visiting different places."""
+    answer = ask(conn, "Which region gets the most tourism?")
+    assert answer.kind == "answer"
+    assert answer.intent == "tourism_by_region"
+    assert "Georgian residents" in answer.headline
+    assert "inbound" in answer.headline.lower()
+
+
+def test_tourism_answer_warns_about_the_pandemic_gap_and_the_unit(conn):
+    answer = ask(conn, "Which region gets the most tourism?")
+    assert "2020-Q2" in answer.caveat and "2021-Q4" in answer.caveat
+    assert "not a visitor" in answer.caveat
+
+
+def test_tourism_answer_carries_a_quarterly_period(conn):
+    answer = ask(conn, "Which region gets the most tourism?")
+    assert "-Q" in answer.provenance[0]["period"]
+    assert answer.provenance[0]["unit"] == "thousand_visits"
+
+
+def test_a_tourism_forecast_is_still_refused(conn):
+    assert ask(conn, "how much tourism in 2030").is_refusal

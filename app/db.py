@@ -10,11 +10,15 @@ Plain SQL, stdlib sqlite3, no ORM.
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DB_PATH = REPO_ROOT / "data" / "geostats.db"
+# The index is derived and rebuilt on every start, so it can live anywhere
+# writable. GEOSTATS_DB moves it off the repo for hosts whose application
+# directory is read-only (serverless), where the default path cannot be created.
+DB_PATH = Path(os.environ.get("GEOSTATS_DB") or REPO_ROOT / "data" / "geostats.db")
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS vintages (
@@ -34,6 +38,10 @@ CREATE TABLE IF NOT EXISTS vintages (
 CREATE TABLE IF NOT EXISTS observations (
     dataset_id      TEXT NOT NULL,
     indicator_code  TEXT NOT NULL,
+    -- Printed name of the measure. Empty on the datasets whose measure is
+    -- fixed and whose rows are breakdowns; carries the sheet's own wording
+    -- where the measure varies down the rows instead.
+    indicator_label TEXT NOT NULL DEFAULT '',
     breakdown_code  TEXT NOT NULL,
     breakdown_label TEXT NOT NULL,
     period          TEXT NOT NULL,
@@ -79,10 +87,16 @@ def bootstrap(conn: sqlite3.Connection) -> None:
 
 
 def reset(conn: sqlite3.Connection) -> None:
-    """Idempotent seeding: wipe the derived tables, then reload."""
-    conn.executescript(SCHEMA)
+    """Idempotent seeding: drop the derived tables, then recreate and reload.
+
+    Dropping rather than emptying is deliberate. This database is a read index
+    derived from the committed vintages and is rebuilt on every start, so a
+    schema change here costs nothing - whereas `DELETE FROM` would leave an
+    older table shape in place and fail on the first new column.
+    """
     for table in ("observations", "vintages", "contract_runs"):
-        conn.execute(f"DELETE FROM {table}")
+        conn.execute(f"DROP TABLE IF EXISTS {table}")
+    conn.executescript(SCHEMA)
     conn.commit()
 
 
@@ -171,6 +185,114 @@ def breakdowns(
     ).fetchall()
 
 
+def indicators(
+    conn: sqlite3.Connection, dataset_id: str, *, vintage_id: str | None = None
+) -> list[sqlite3.Row]:
+    """Every measure in a dataset, with the printed name where one exists."""
+    vintage_id = vintage_id or latest_vintage_id(conn, dataset_id)
+    return conn.execute(
+        """
+        SELECT indicator_code,
+               MAX(indicator_label) AS indicator_label,
+               COUNT(*) AS n,
+               MIN(period) AS first_period, MAX(period) AS last_period,
+               MIN(unit) AS unit
+          FROM observations
+         WHERE dataset_id = ? AND vintage_id = ?
+      GROUP BY indicator_code
+      ORDER BY indicator_code
+        """,
+        (dataset_id, vintage_id),
+    ).fetchall()
+
+
+def cross_section(
+    conn: sqlite3.Connection,
+    dataset_id: str,
+    indicator_code: str,
+    period: str,
+    *,
+    vintage_id: str | None = None,
+) -> dict[str, float]:
+    """One measure across every breakdown for a single period.
+
+    This is the shape every regional view needs: a map keyed by the geography
+    code, so two datasets can be compared region by region without either one
+    knowing about the other.
+    """
+    vintage_id = vintage_id or latest_vintage_id(conn, dataset_id)
+    if vintage_id is None:
+        return {}
+    rows = conn.execute(
+        """SELECT breakdown_code, value FROM observations
+            WHERE dataset_id = ? AND vintage_id = ? AND indicator_code = ?
+              AND period = ? AND value IS NOT NULL""",
+        (dataset_id, vintage_id, indicator_code, period),
+    ).fetchall()
+    return {r["breakdown_code"]: r["value"] for r in rows}
+
+
+def periods_for(
+    conn: sqlite3.Connection,
+    dataset_id: str,
+    indicator_code: str | None = None,
+    *,
+    vintage_id: str | None = None,
+) -> list[str]:
+    vintage_id = vintage_id or latest_vintage_id(conn, dataset_id)
+    if vintage_id is None:
+        return []
+    sql = """SELECT DISTINCT period FROM observations
+              WHERE dataset_id = ? AND vintage_id = ? AND value IS NOT NULL"""
+    args: list = [dataset_id, vintage_id]
+    if indicator_code:
+        sql += " AND indicator_code = ?"
+        args.append(indicator_code)
+    return [r["period"] for r in conn.execute(sql + " ORDER BY period", args)]
+
+
+def observations(
+    conn: sqlite3.Connection,
+    dataset_id: str,
+    *,
+    indicator_code: str | None = None,
+    breakdown_code: str | None = None,
+    period_from: str | None = None,
+    period_to: str | None = None,
+    vintage_id: str | None = None,
+    limit: int | None = None,
+) -> list[sqlite3.Row]:
+    """Filtered rows for the generalised explorer and its CSV export.
+
+    Both callers read from here so the download cannot drift from the table it
+    claims to be a copy of.
+    """
+    vintage_id = vintage_id or latest_vintage_id(conn, dataset_id)
+    if vintage_id is None:
+        return []
+    sql = """SELECT dataset_id, indicator_code, indicator_label, breakdown_code,
+                    breakdown_label, period, unit, value, raw, status,
+                    is_preliminary, vintage_id
+               FROM observations
+              WHERE dataset_id = ? AND vintage_id = ?"""
+    args: list = [dataset_id, vintage_id]
+    for column, value in (("indicator_code", indicator_code),
+                          ("breakdown_code", breakdown_code)):
+        if value:
+            sql += f" AND {column} = ?"
+            args.append(value)
+    if period_from:
+        sql += " AND period >= ?"
+        args.append(period_from)
+    if period_to:
+        sql += " AND period <= ?"
+        args.append(period_to)
+    sql += " ORDER BY indicator_code, breakdown_code, period"
+    if limit:
+        sql += f" LIMIT {int(limit)}"
+    return conn.execute(sql, args).fetchall()
+
+
 def contract_results(
     conn: sqlite3.Connection, dataset_id: str, vintage_id: str | None = None
 ) -> list[sqlite3.Row]:
@@ -206,6 +328,22 @@ def summary(conn: sqlite3.Connection) -> dict:
                   (SELECT MAX(retrieved_at) FROM vintages) AS last_retrieved"""
     ).fetchone()
     return dict(row)
+
+
+def failing_checks(conn: sqlite3.Connection) -> list[sqlite3.Row]:
+    """Every red check on a latest vintage, for the health endpoint.
+
+    Restricted to latest vintages: a superseded release failing a check is
+    history, and history is exactly what this project refuses to rewrite.
+    """
+    return conn.execute(
+        """SELECT c.dataset_id, c.vintage_id, c.code, c.message
+             FROM contract_runs c
+             JOIN vintages v
+               ON v.dataset_id = c.dataset_id AND v.vintage_id = c.vintage_id
+            WHERE c.passed = 0 AND v.is_latest = 1
+            ORDER BY c.dataset_id, c.code"""
+    ).fetchall()
 
 
 def meta_for(conn: sqlite3.Connection, dataset_id: str, vintage_id: str) -> dict:
