@@ -8,3 +8,5 @@ data/cache/
 # Local design material. Lives in the working tree so it is to hand, never in
 # the repository: it is source for other projects, not part of this one.
 claude-designer/
+.vercel
+.env*

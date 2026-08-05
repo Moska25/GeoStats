@@ -1,0 +1,26 @@
+# The CLI uploads the working directory, not the git tree, so everything git
+# ignores has to be named again here. The vintages under data/ are the payload
+# and must stay; the derived index is rebuilt into /tmp on every cold start.
+.venv
+.git
+__pycache__
+*.pyc
+.pytest_cache
+
+# Rebuilt at startup from the vintages - 10 MB of dead weight in the bundle.
+data/geostats.db
+data/cache
+
+# Credentials the Vercel CLI writes locally. Never part of a deployment.
+.env
+.env.*
+
+# Not served: screenshots, the test suite and the capture tooling.
+docs
+tests
+tools
+claude-designer
+
+# Other hosts' build files.
+Dockerfile
+.dockerignore
