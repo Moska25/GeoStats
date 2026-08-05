@@ -12,13 +12,38 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
+import tempfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-# The index is derived and rebuilt on every start, so it can live anywhere
-# writable. GEOSTATS_DB moves it off the repo for hosts whose application
-# directory is read-only (serverless), where the default path cannot be created.
-DB_PATH = Path(os.environ.get("GEOSTATS_DB") or REPO_ROOT / "data" / "geostats.db")
+
+
+def scratch_dir(preferred: Path) -> Path:
+    """`preferred` if it can be written to, a temp directory otherwise.
+
+    Serverless hosts mount the application directory read-only. Everything this
+    guards is derived data - the sqlite index, the fault lab's copies - rebuilt
+    from the committed vintages on every start, so relocating it costs nothing
+    and loses nothing.
+
+    Deliberately a runtime probe rather than an environment variable the host
+    has to remember to set: Vercel's FastAPI preset imports app/main.py itself
+    and never runs a custom entrypoint, so anything that depends on one being
+    executed first is a deployment that crashes on import.
+    """
+    try:
+        preferred.mkdir(parents=True, exist_ok=True)
+        if os.access(preferred, os.W_OK):
+            return preferred
+    except OSError:
+        pass
+    return Path(tempfile.gettempdir()) / preferred.name
+
+
+# GEOSTATS_DB still wins when set, for anyone who wants it somewhere specific.
+DB_PATH = Path(
+    os.environ.get("GEOSTATS_DB") or scratch_dir(REPO_ROOT / "data") / "geostats.db"
+)
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS vintages (

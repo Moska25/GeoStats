@@ -324,6 +324,11 @@ def copy_vintage_to(
     if dst.exists():
         shutil.rmtree(dst)
     shutil.copytree(src, dst)
+    # copytree preserves the source's mode, and the source is a committed
+    # vintage: 0444 files, and on a read-only host a read-only directory too.
+    # Thaw the directory before its contents - a 0555 copy cannot have anything
+    # replaced inside it, so the next run's rmtree above dies on PermissionError.
+    dst.chmod(0o755)
     for child in dst.iterdir():
         _thaw(child)
     return dst

@@ -22,13 +22,17 @@ from pathlib import Path
 from typing import Callable
 
 from .contracts import run_contracts
+from .db import scratch_dir
 from .ingest import (
     REPO_ROOT, copy_vintage_to, read_raw, read_rows, VINTAGE_ROOT, diff_rows,
 )
 
 # Scratch space for injected copies - never read back, never committed. Same
-# reason as GEOSTATS_DB: a read-only application directory needs it elsewhere.
-LAB_DIR = Path(os.environ.get("GEOSTATS_LAB_DIR") or REPO_ROOT / "data" / "cache" / "lab")
+# read-only-host problem as the sqlite index, so it takes the same fallback.
+LAB_DIR = Path(
+    os.environ.get("GEOSTATS_LAB_DIR")
+    or scratch_dir(REPO_ROOT / "data" / "cache") / "lab"
+)
 
 
 @dataclass
